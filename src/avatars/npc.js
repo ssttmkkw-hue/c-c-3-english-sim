@@ -34,6 +34,12 @@ export function createNPC(def, anchor, colliders) {
     react: null,
     reactT: 0,
     bubbleUntil: 0,
+    bubbleKind: '',
+    bubbleText: '',
+    bubbleFading: false,
+    bubbleFadeLeft: 0,
+    bubbleFadeDur: 0.4,
+    bubbleDim: false,
     wanderTarget: null,
     baseX: x,
     baseZ: z,
@@ -43,13 +49,53 @@ export function createNPC(def, anchor, colliders) {
     fidget: 4 + Math.random() * 8,
   };
 
-  function say(text, now) {
-    setBubbleText(avatar.bubble, text);
-    state.bubbleUntil = now + Math.min(4.2, 1.6 + text.length * 0.035);
+  function say(text, now, hold, kind = 'main') {
+    const style = kind === 'back' ? 'back' : 'main';
+    setBubbleText(avatar.bubble, text, style);
+    state.bubbleKind = style;
+    state.bubbleText = String(text || '');
+    state.bubbleFading = false;
+    state.bubbleFadeLeft = 0;
+    state.bubbleDim = false;
+    const life = Math.max(0.6, Number(hold) || 2);
+    state.bubbleUntil = now + life;
+    avatar.bubble.material.opacity = style === 'back' ? 0.72 : 1;
+    avatar.bubble.visible = true;
+  }
+
+  function fadeBubble(seconds = 0.4) {
+    if (state.bubbleKind !== 'main' && state.bubbleKind !== 'fade') return;
+    state.bubbleFading = true;
+    state.bubbleFadeDur = Math.max(0.05, seconds);
+    state.bubbleFadeLeft = state.bubbleFadeDur;
+    state.bubbleKind = 'fade';
+    state.bubbleDim = true;
+  }
+
+  function dimBubble() {
+    if (state.bubbleKind !== 'main') return;
+    state.bubbleDim = true;
+    avatar.bubble.material.opacity = 0.58;
+  }
+
+  function stepFade(dt) {
+    if (!state.bubbleFading) return;
+    state.bubbleFadeLeft -= dt;
+    const dur = state.bubbleFadeDur || 0.4;
+    avatar.bubble.material.opacity = 0.58 * Math.max(0, state.bubbleFadeLeft / dur);
+    if (state.bubbleFadeLeft <= 0) {
+      state.bubbleFading = false;
+      state.bubbleKind = '';
+      avatar.bubble.visible = false;
+    }
   }
 
   function hideBubble(now) {
-    if (avatar.bubble.visible && now > state.bubbleUntil) avatar.bubble.visible = false;
+    if (state.bubbleFading) return;
+    if (state.bubbleKind === 'back' && now >= state.bubbleUntil) {
+      state.bubbleKind = '';
+      avatar.bubble.visible = false;
+    }
   }
 
   function face(tx, tz) {
@@ -121,7 +167,8 @@ export function createNPC(def, anchor, colliders) {
   }
 
   function update(dt, now, paused, bodies) {
-    state.speaking = now < state.bubbleUntil;
+    state.speaking = state.bubbleKind === 'main' && !state.bubbleDim;
+    stepFade(dt);
     const ang = ((def.name || 'A').charCodeAt(0) % 9) * 0.7 + 0.35;
     const freed = pushOutOfBodies(
       avatar.root.position.x,
@@ -189,8 +236,25 @@ export function createNPC(def, anchor, colliders) {
     bubbleUntil() {
       return state.bubbleUntil;
     },
+    bubbleLive() {
+      return state.bubbleKind === 'main' || state.bubbleKind === 'back' || state.bubbleFading;
+    },
+    bubbleKind() {
+      return state.bubbleKind;
+    },
+    bubbleText() {
+      return state.bubbleText;
+    },
+    isMainBubble() {
+      return state.bubbleKind === 'main';
+    },
+    fadeBubble,
+    dimBubble,
     silence(time) {
       state.bubbleUntil = time;
+      state.bubbleKind = '';
+      state.bubbleFading = false;
+      state.bubbleDim = false;
       avatar.bubble.visible = false;
     },
     distanceTo(x, z) {

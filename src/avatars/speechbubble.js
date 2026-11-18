@@ -17,25 +17,29 @@ export function makeSpeechBubble() {
   return sprite;
 }
 
-export function setBubbleText(sprite, text) {
+export function setBubbleText(sprite, text, kind = 'main') {
   const canvas = sprite.userData.canvas;
   const ctx = canvas.getContext('2d');
+  const back = kind === 'back';
+  sprite.userData.kind = back ? 'back' : 'main';
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = 'rgba(255,255,255,0.94)';
-  roundRect(ctx, 8, 8, 496, 150, 22);
+  ctx.fillStyle = back ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.94)';
+  if (back) roundRect(ctx, 96, 48, 320, 96, 28);
+  else roundRect(ctx, 8, 8, 496, 150, 22);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(55,71,79,0.35)';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = back ? 'rgba(55,71,79,0.18)' : 'rgba(55,71,79,0.35)';
+  ctx.lineWidth = back ? 3 : 4;
   ctx.stroke();
-  ctx.fillStyle = '#263238';
-  ctx.font = '28px sans-serif';
+  ctx.fillStyle = back ? 'rgba(38,50,56,0.72)' : '#263238';
+  ctx.font = back ? '30px sans-serif' : '28px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const lines = wrap(ctx, text, 450);
-  const startY = 84 - (lines.length - 1) * 16;
+  const lines = wrap(ctx, text, back ? 280 : 450).slice(0, back ? 1 : 3);
+  const startY = (back ? 96 : 84) - (lines.length - 1) * 16;
   lines.forEach((line, i) => ctx.fillText(line, 256, startY + i * 32));
   sprite.userData.tex.needsUpdate = true;
   sprite.visible = true;
+  sprite.material.opacity = back ? 0.72 : 1;
 }
 
 function wrap(ctx, text, max) {

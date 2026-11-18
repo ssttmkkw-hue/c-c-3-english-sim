@@ -107,26 +107,162 @@ export function createSpeechInput() {
 
 const PITCH = [0.85, 1.05, 1.15, 0.95, 1.2, 0.9];
 
+const lanes = {
+  ambient: { queue: [], active: null },
+  foreground: { queue: [], active: null },
+};
+
+let ambientMuted = false;
+let pumpTimer = 0;
+
 export function englishVoices() {
   if (!window.speechSynthesis || typeof window.speechSynthesis.getVoices !== 'function') return [];
   return window.speechSynthesis.getVoices().filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith('en'));
 }
 
-export function speakLine(text, voiceIndex, options = {}) {
-  if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') return;
-  const utter = new SpeechSynthesisUtterance(text);
+function canSpeak() {
+  return !!(window.speechSynthesis && typeof SpeechSynthesisUtterance === 'function');
+}
+
+function dropJob(job) {
+  if (!job || job.done) return;
+  job.done = true;
+  clearTimeout(job.timer);
+  if (job.lane && lanes[job.lane].active === job) lanes[job.lane].active = null;
+  job.resolve();
+}
+
+function dropAmbient() {
+  const lane = lanes.ambient;
+  const queued = lane.queue.splice(0);
+  for (const job of queued) dropJob(job);
+  if (lane.active) {
+    const job = lane.active;
+    lane.active = null;
+    dropJob(job);
+    try { window.speechSynthesis.cancel(); } catch (err) { /* already quiet */ }
+    return true;
+  }
+  return false;
+}
+
+function finishJob(job, cancelSynth) {
+  if (!job || job.done) return;
+  job.done = true;
+  clearTimeout(job.timer);
+  const lane = lanes[job.lane];
+  const wasActive = lane.active === job;
+  if (wasActive) lane.active = null;
+  if (cancelSynth && wasActive) {
+    try { window.speechSynthesis.cancel(); } catch (err) { /* already quiet */ }
+  }
+  job.resolve();
+  if (cancelSynth && wasActive) {
+    clearTimeout(pumpTimer);
+    pumpTimer = setTimeout(pump, 40);
+  } else {
+    pump();
+  }
+}
+
+function startJob(job) {
+  const lane = lanes[job.lane];
+  if (!canSpeak()) {
+    finishJob(job, false);
+    return;
+  }
+  const utter = new SpeechSynthesisUtterance(job.text);
   utter.lang = 'en-US';
-  utter.pitch = PITCH[(voiceIndex || 0) % PITCH.length];
-  const rate = Number(options.rate);
+  utter.pitch = PITCH[(job.voiceIndex || 0) % PITCH.length];
+  const rate = Number(job.options.rate);
   utter.rate = Number.isFinite(rate) ? Math.min(1.4, Math.max(0.6, rate)) : 0.96;
   const voices = englishVoices();
-  const picked = options.voiceURI && voices.find((voice) => voice.voiceURI === options.voiceURI);
+  const picked = job.options.voiceURI && voices.find((voice) => voice.voiceURI === job.options.voiceURI);
   if (picked) utter.voice = picked;
-  else if (voices.length) utter.voice = voices[(voiceIndex || 0) % voices.length];
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utter);
+  else if (voices.length) utter.voice = voices[(job.voiceIndex || 0) % voices.length];
+  lane.active = job;
+  const words = String(job.text || '').trim().split(/\s+/).filter(Boolean).length;
+  const cap = Math.min(9000, Math.max(1600, (Math.max(1.4, words / 2.6) * 1.8) * 1000));
+  job.timer = setTimeout(() => finishJob(job, true), cap);
+  utter.onend = () => finishJob(job, false);
+  utter.onerror = () => finishJob(job, false);
+  try {
+    window.speechSynthesis.speak(utter);
+  } catch (err) {
+    finishJob(job, false);
+  }
+}
+
+function pump() {
+  if (!lanes.foreground.active && lanes.foreground.queue.length) {
+    const cancelled = dropAmbient();
+    const job = lanes.foreground.queue.shift();
+    if (cancelled) {
+      clearTimeout(pumpTimer);
+      pumpTimer = setTimeout(() => startJob(job), 40);
+    } else {
+      startJob(job);
+    }
+    return;
+  }
+  if (lanes.foreground.active || lanes.foreground.queue.length || ambientMuted) return;
+  if (!lanes.ambient.active && lanes.ambient.queue.length) startJob(lanes.ambient.queue.shift());
+}
+
+/**
+ * Speak one line. Resolves on utterance onend (or when speech is unavailable).
+ * Ambient lines queue and never cancel each other.
+ * Foreground lines (the player's conversation, practice, retry) take priority:
+ * they clear queued ambient speech. Pass interrupt to replace the current foreground line.
+ */
+export function speakLine(text, voiceIndex, options = {}) {
+  const laneName = options.lane === 'ambient' ? 'ambient' : 'foreground';
+  return new Promise((resolve) => {
+    const clean = String(text || '').trim();
+    if (!clean || !canSpeak()) {
+      resolve();
+      return;
+    }
+    if (laneName === 'ambient' && (ambientMuted || lanes.foreground.active || lanes.foreground.queue.length)) {
+      resolve();
+      return;
+    }
+    const job = {
+      text: clean,
+      voiceIndex,
+      options,
+      resolve,
+      lane: laneName,
+      done: false,
+      timer: 0,
+    };
+    const replaceCurrent = laneName === 'foreground' && options.interrupt && lanes.foreground.active;
+    if (replaceCurrent) finishJob(lanes.foreground.active, true);
+    lanes[laneName].queue.push(job);
+    if (!replaceCurrent) pump();
+  });
+}
+
+/** While muted, ambient lines are not spoken. Foreground lines still play. */
+export function setAmbientMuted(muted) {
+  const next = !!muted;
+  if (next === ambientMuted) return;
+  ambientMuted = next;
+  if (ambientMuted) dropAmbient();
 }
 
 export function stopSpeaking() {
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  const pending = [
+    ...lanes.ambient.queue.splice(0),
+    ...lanes.foreground.queue.splice(0),
+  ];
+  if (lanes.ambient.active) pending.push(lanes.ambient.active);
+  if (lanes.foreground.active) pending.push(lanes.foreground.active);
+  lanes.ambient.active = null;
+  lanes.foreground.active = null;
+  for (const job of pending) dropJob(job);
+  clearTimeout(pumpTimer);
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.cancel(); } catch (err) { /* already quiet */ }
+  }
 }
