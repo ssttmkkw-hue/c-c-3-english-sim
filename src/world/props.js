@@ -499,12 +499,11 @@ export function makeSkitSpot(group, x, z) {
 const rehearsalWood = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.86, metalness: 0.02 });
 const rehearsalTop = new THREE.MeshStandardMaterial({ color: 0xeceff1, roughness: 0.7, metalness: 0.04 });
 const mirrorFrame = new THREE.MeshStandardMaterial({ color: 0x455a64, roughness: 0.42, metalness: 0.38 });
-const mirrorGlass = new THREE.MeshStandardMaterial({
-  color: 0xb3e5fc,
-  roughness: 0.06,
-  metalness: 0.72,
+const mirrorGlass = new THREE.MeshBasicMaterial({
+  color: 0xd7f6ff,
   transparent: true,
-  opacity: 0.5,
+  opacity: 0.9,
+  side: THREE.DoubleSide,
 });
 
 /** A desk and a mirror for the private room. Materials are shared, not per visit. */

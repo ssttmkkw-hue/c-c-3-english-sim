@@ -130,20 +130,17 @@ export function createScene() {
   if (rehearsal) {
     makeRehearsalDesk(props, -44.2, 1.5, 0, colliders);
     makeMirror(props, -47.5, 0, Math.PI / 2, colliders);
-    const door = rehearsal.portal || { x: -34, z: 0 };
-    addIslandSign(scene, 'Rehearsal', '排练室', '#00897b', door.x, door.z + 2.6);
+    addIslandSign(scene, 'Rehearsal', '排练室', '#00897b', -45.4, -3.1, rehearsal.spawn);
   }
   const airport = ZONES.find((zone) => zone.id === 'airport');
   if (airport) {
     makeCounter(props, -46.6, -38, 4.2, Math.PI / 2, colliders, 0x3949ab);
-    const door = airport.portal || { x: -34, z: -33 };
-    addIslandSign(scene, 'Airport', '机场', '#3949ab', door.x - 2.4, door.z);
+    addIslandSign(scene, 'Airport', '机场', '#3949ab', -44.2, -35.4, airport.spawn);
   }
   const pharmacy = ZONES.find((zone) => zone.id === 'pharmacy');
   if (pharmacy) {
     makeCounter(props, 46.4, 38, 4.2, Math.PI / 2, colliders, 0x00695c);
-    const door = pharmacy.portal || { x: 34, z: 32 };
-    addIslandSign(scene, 'Pharmacy', '药店', '#00695c', door.x, door.z + 2.2);
+    addIslandSign(scene, 'Pharmacy', '药店', '#00695c', 43.6, 35.2, pharmacy.spawn);
   }
   const portalRings = [];
   for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));
@@ -170,7 +167,7 @@ export function createScene() {
   return { scene, colliders, portalRings, sun, showBoard };
 }
 
-function addIslandSign(scene, title, sub, color, x, z) {
+function addIslandSign(scene, title, sub, color, x, z, look) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 256;
@@ -195,7 +192,8 @@ function addIslandSign(scene, title, sub, color, x, z) {
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
   );
   board.position.set(x, 2.35, z);
-  board.lookAt(x, 2.35, z + 4);
+  if (look) board.lookAt(look[0], 2.35, look[1]);
+  else board.lookAt(x, 2.35, z + 4);
   scene.add(board);
   const post = new THREE.Mesh(
     new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8),
