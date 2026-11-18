@@ -287,6 +287,7 @@ function submitText(text, source) {
     return;
   }
   const token = playToken;
+  session.lastLineKey = '';
   choiceList = [];
   hud.setChoices([]);
   hud.showEnd(false);

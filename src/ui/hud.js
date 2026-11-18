@@ -163,7 +163,12 @@ export function createHUD() {
   function addHeard(text) {
     const row = document.createElement('p');
     row.className = 'heard';
-    row.textContent = `Heard: ${text}`;
+    if (text && typeof text === 'object') {
+      const pct = Math.round((Number(text.confidence) || 0) * 100);
+      row.textContent = `Heard: “${text.input}” → ${text.match} (${pct}%)`;
+    } else {
+      row.textContent = `Heard: ${text}`;
+    }
     logEl.appendChild(row);
     logEl.scrollTop = logEl.scrollHeight;
   }

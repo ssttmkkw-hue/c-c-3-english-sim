@@ -13,4 +13,10 @@ export class DialogueEngine {
   respond(userText, context) {
     return this.provider.respond(userText, context);
   }
+
+  /** Expected replies for the current node, including during a confirm prompt. */
+  currentChoices() {
+    if (this.provider.currentChoices) return this.provider.currentChoices();
+    return [];
+  }
 }

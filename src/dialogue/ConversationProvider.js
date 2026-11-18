@@ -10,10 +10,12 @@
  * respond(userText, context) -> Promise<Turn>
  *
  * Turn: {
- *   npcLines: { speaker: string, text: string }[],
- *   choices: { text: string, keywords: string[] }[],
+ *   npcLines: { speaker: string, text: string, zh?: string }[],
+ *   choices: { text: string, zh?: string, keywords: string[] }[],
  *   ended: boolean,
- *   reaction?: 'nod' | 'jump'
+ *   reaction?: 'nod' | 'jump' | 'wave',
+ *   heard?: { input: string, match: string, confidence: number, text: string },
+ *   confirm?: boolean
  * }
  */
 export class ConversationProvider {
