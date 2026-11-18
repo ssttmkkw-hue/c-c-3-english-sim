@@ -838,7 +838,7 @@ function updateVisitors(dt) {
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05) * timeScale;
+  const dt = Math.min(clock.getDelta(), 0.2) * timeScale;
   now += dt;
   const help = hud.uiLocked();
   const look = pointer.read();
@@ -1350,6 +1350,7 @@ window.__sim = {
     const snap = group.director.snapshot();
     return {
       state: snap.state,
+      mode: snap.mode,
       speaker: snap.speaker,
       lineId: snap.lineId,
       sceneId: snap.sceneId,

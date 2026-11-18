@@ -12,7 +12,7 @@ A static, VRChat-style plaza for beginner–intermediate English practice. Avata
 - Three daily missions, with a streak when you finish all of them. On a phone they collapse to a `Today 0/3` pill. 每天三个任务。手机上收成 `Today 0/3` 小胶囊。
 - Avatar panel in Settings: display name (default You), body color, and hair style, saved on this browser. 设置里的形象：名字（默认 You）、衣服颜色、发型，存在本地。
 - A short 3-step tip the first time you close the help card. 第一次关掉帮助后，有三步可跳过的提示。
-- Groups take turns. One person speaks at a time, listeners look at the speaker, and someone may nod or say a short “Mm-hm.” Joining waits until the current line ends, then a welcome. Leaving says a short goodbye and the chat continues from the next scene. When it is your turn, the panel glows with “Your turn — take your time.” There is no countdown. After a quiet moment, someone may say “Take your time.” 小组轮流说话。一次只有一个人说，其他人看着说话的人，有时会点头或轻轻说 “Mm-hm”。加入时会等当前这句说完，再欢迎你。离开时有一句短告别，然后从下一小段接着聊。轮到你时，面板会轻轻发光，并显示 “Your turn — take your time”。没有倒计时。安静一会儿后，可能会有人说 “Take your time.”。
+- Groups take turns. One person speaks at a time, listeners look at the speaker, and someone may nod or say a short “Mm-hm.” With no browser voice, a line stays up long enough to read (at least about a second and a half, a bit longer for a long sentence). The pause after a line is usually about half a second to a second and a half, and a little longer after a question. If read-aloud never finishes, the chat still moves on. Joining lets the current line finish, or cuts in after a second if it has already been going, then a welcome. Leaving says a short goodbye and the chat continues from the next scene. When it is your turn, the panel glows with “Your turn — take your time.” There is no countdown. After a quiet moment, someone may say “Take your time.” 小组轮流说话。一次只有一个人说，其他人看着说话的人，有时会点头或轻轻说 “Mm-hm”。浏览器没有语音时，每句会停够你看完（大约至少一秒半，长句再久一点）。句与句之间通常大约停半秒到一秒半，问句后面会稍长一点。如果朗读一直不结束，对话也会继续往下走。加入时会等当前这句说完；如果这句已经说了一秒，就先迎你进来。离开时有一句短告别，然后从下一小段接着聊。轮到你时，面板会轻轻发光，并显示 “Your turn — take your time”。没有倒计时。安静一会儿后，可能会有人说 “Take your time.”。
 
 ## Run / 运行
 
@@ -31,7 +31,7 @@ Open `http://localhost:8000`.
 - **Emotes / 表情:** `1` wave, `2` nod, `3` jump.
 - **Join / 加入:** Near a group, press **E** (or Join). A chooser lists that zone’s conversations with a title and a level (Beginner or Intermediate). Pick one. If someone is mid-sentence, they finish, then say hello. Members walk into a circle with you and turn inward. Nearby ambient chat is a few short scenes, and the group remembers where it left off. 靠近人群按 E，先看到标题和难度，再加入。如果有人说到一半，会等这句说完再打招呼。旁边的闲聊是几段小对话，离开后从下一段接着说。
 - **1-on-1 / 一对一:** Near a person with a personal chat, press **F** (or Talk). They turn to face you. Extra people stand around the plaza: Tourist Nina (directions), Librarian Ada (a short grammar exercise), Musician Jo, and Customer Bea (shop-counter phrases). 广场上还有游客 Nina、图书管理员 Ada、街头乐手 Jo、商店顾客 Bea。
-- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or the mic button). On a narrow screen the mic button is an icon plus **Talk**, and the buttons sit on two rows. NPC lines in a chat also take turns, with a short pause between them. 窄屏上麦克风按钮是图标加 Talk，按钮分成两行。对话里的 NPC 也轮流说，两句之间有一点停顿。
+- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or the mic button). On a narrow screen the mic button is an icon plus **Talk**, and the buttons sit on two rows. NPC lines in a chat also take turns. The “…” mark means someone is still speaking; it does not stay up if the voice engine is silent. 窄屏上麦克风按钮是图标加 Talk，按钮分成两行。对话里的 NPC 也轮流说。“…” 表示还有人在说；如果语音引擎没有声音，它也不会一直停在那里。
 - **Your turn / 轮到你:** A soft glow and the words “Your turn — take your time” (轮到你了，慢慢来). Nobody counts down. If you are quiet for a bit, an NPC says “Take your time.” 没有倒计时。你安静一会儿，会有人说 “Take your time.”。
 - **Hint / 提示:** Shows the first words of the replies you can give. 显示可用回答的前几个词。
 - **Retry / 再说:** Say your line again. If the script is asking “Did you mean …?”, Retry cancels that guess. 再讲一次；如果正在确认，就取消这次猜测。
@@ -108,7 +108,7 @@ The live provider is `ScriptedProvider`. It walks the graphs in `src/data/` and 
 - `joinConversation(id)` — starts that group chat, or a 1-on-1 when `id` is a character id
 - `join()` opens the chooser for the nearest group. `chat()`, `say(text)`, `choose(index)`, `leave()`, `chatWith(name)`
 - `getSettings()` / `setSettings(partial)` — `tts`, `voiceURI`, `rate`, `subtitles`, `zh`, `difficulty` (`any`, `beginner`, `intermediate`)
-- `getDirector(groupId)` for `cafe`, `park`, `class`, `shop` → `{ state, speaker, lineId, sceneId, overlapsDetected }` (`state` is `gap`, `leadIn`, `speaking`, `tail`, or `held`)
+- `getDirector(groupId)` for `cafe`, `park`, `class`, `shop` → `{ state, mode, speaker, lineId, sceneId, overlapsDetected }` (`state` is `gap`, `leadIn`, `speaking`, `tail`, or `held`; `mode` is `ambient`, `dialogue`, `join`, `farewell`, `aside`, or `idle`)
 - `mainBubbleOverlaps()` → how many times two main speaking bubbles in one group were visible together (stays `0`)
 - `timeScale` — sim clock multiplier (default `1`, clamped from `0.25` to `40`). `now()` reads sim time. `setTimeScale(n)` / `getTimeScale()` do the same as the property.
 - `requestVisitor(groupId, text)` queues a wanderer’s line for the next gap. `bubbleOf(name)` → `{ text, kind, main }`

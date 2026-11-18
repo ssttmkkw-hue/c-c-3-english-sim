@@ -4,14 +4,19 @@
  * Backchannels are the only overlap. Main bubbles fade; they do not stack.
  */
 
-const LEAD_IN = 0.3;
-const TAIL = 0.2;
+const LEAD_IN = 0.2;
+const TAIL = 0.12;
 const BACK_COOLDOWN = 8;
 const BACK_EARLIEST = 0.8;
 
 export function estimateLineDuration(text) {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1.4, words / 2.6);
+  // Readable, and a full classroom chat still ends before a short wait.
+  return Math.max(1.4, words / 4.6 + 0.08);
+}
+
+function nowMs() {
+  return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 }
 
 function wordCount(text) {
@@ -105,7 +110,33 @@ export function createSceneDirector(options) {
     }
     if (isQuick(next)) return 0.2 + random() * 0.2;
     if (line && isQuestion(line.text)) return 1.5 + random() * 1.0;
-    return 0.5 + random() * 0.7;
+    return 0.5 + random() * 1.0;
+  }
+
+  let waitSpan = 0;
+  let waitMark = nowMs();
+  let lineMark = 0;
+  let playTimer = 0;
+  let joinTimer = 0;
+  let suspendTimer = 0;
+
+  function arm(now, seconds) {
+    const span = Math.max(0, Number(seconds) || 0);
+    stateUntil = now + span;
+    waitSpan = span;
+    waitMark = nowMs();
+  }
+
+  function armed(now) {
+    if (hurry) return true;
+    if (now >= stateUntil) return true;
+    return (nowMs() - waitMark) / 1000 >= waitSpan;
+  }
+
+  function spokenFor(now) {
+    const sim = Math.max(0, now - lineStart);
+    const wall = Math.max(0, (nowMs() - lineMark) / 1000);
+    return Math.max(sim, wall);
   }
 
   function notePark() {
@@ -265,35 +296,39 @@ export function createSceneDirector(options) {
   }
 
   function serviceSpeaking(now) {
-    const elapsed = now - lineStart;
-    for (const nod of nods) {
-      if (nod.done || elapsed < nod.at) continue;
-      nod.done = true;
-      const npc = npcByName(nod.who);
-      if (npc) npc.react(nod.kind || 'nod');
-    }
-    if (!backFired && elapsed >= BACK_EARLIEST && now - lastBackAt >= BACK_COOLDOWN) {
-      for (const item of currentLine.back || []) {
-        const frac = typeof item.at === 'number' ? item.at : 0.55;
-        const when = frac <= 1.25 ? Math.max(BACK_EARLIEST, frac * minDur) : frac;
-        if (elapsed >= when) {
-          fireBack(item, now);
-          break;
+    const elapsed = spokenFor(now);
+    try {
+      for (const nod of nods) {
+        if (nod.done || elapsed < nod.at) continue;
+        nod.done = true;
+        const npc = npcByName(nod.who);
+        if (npc) npc.react(nod.kind || 'nod');
+      }
+      if (!backFired && elapsed >= BACK_EARLIEST && now - lastBackAt >= BACK_COOLDOWN && currentLine) {
+        for (const item of currentLine.back || []) {
+          const frac = typeof item.at === 'number' ? item.at : 0.55;
+          const when = frac <= 1.25 ? Math.max(BACK_EARLIEST, frac * minDur) : frac;
+          if (elapsed >= when) {
+            fireBack(item, now);
+            break;
+          }
         }
       }
-    }
-    if (elapsed >= watchdog || (elapsed >= minDur && ttsDone)) enterTail(now);
+    } catch (err) { /* a nod must not freeze the line */ }
+    const joinCut = (pendingWelcome || mode === 'join') && elapsed >= Math.min(minDur, 1.05);
+    if (joinCut || elapsed >= watchdog || (elapsed >= minDur && ttsDone)) enterTail(now);
   }
 
   function serviceHeld(now) {
     if (!patience) return;
     const members = getMembers();
-    if (!noddedWait && now - heldSince >= 6 && members.length) {
+    const waited = heldFor(now);
+    if (!noddedWait && waited >= 6 && members.length) {
       noddedWait = true;
       const npc = members[Math.floor(random() * members.length)];
       if (npc) npc.react('nod');
     }
-    if (!nudged && now - heldSince >= 8) {
+    if (!nudged && waited >= 8) {
       nudged = true;
       const who = staffName();
       if (!who) return;
@@ -316,7 +351,7 @@ export function createSceneDirector(options) {
     lineId = line.id || null;
     speakerNpc = npc;
     state = 'leadIn';
-    stateUntil = lastNow + LEAD_IN;
+    arm(lastNow, LEAD_IN);
     backFired = false;
     planGaze(lastNow);
     return true;
@@ -325,8 +360,9 @@ export function createSceneDirector(options) {
   function beginSpeaking(now) {
     const text = currentLine.text;
     minDur = estimateLineDuration(text);
-    watchdog = minDur * 1.8;
+    watchdog = minDur * 1.5;
     lineStart = now;
+    lineMark = nowMs();
     state = 'speaking';
     nods = planNods(currentLine);
     for (const npc of getMembers()) {
@@ -336,13 +372,15 @@ export function createSceneDirector(options) {
     speakerNpc.say(text, now, watchdog + 8, 'main');
     sampleOverlap();
     ttsDone = true;
-    const pending = onSpeak(currentLine, currentKind);
+    let pending = null;
+    try { pending = onSpeak(currentLine, currentKind); } catch (err) { pending = null; }
     if (pending && typeof pending.then === 'function') {
       ttsDone = false;
       const token = ++speakToken;
-      pending.then(() => {
+      const markHeard = () => {
         if (token === speakToken) ttsDone = true;
-      });
+      };
+      pending.then(markHeard, markHeard);
     }
     if (currentLine.emote && speakerNpc.react) speakerNpc.react(currentLine.emote);
     onLine(currentLine, currentKind);
@@ -350,14 +388,27 @@ export function createSceneDirector(options) {
 
   function enterTail(now) {
     state = 'tail';
-    stateUntil = now + TAIL;
+    arm(now, TAIL);
     if (speakerNpc) speakerNpc.dimBubble();
   }
 
   function releaseDialogue() {
+    clearTimeout(playTimer);
+    playTimer = 0;
     const resolve = dialogueResolve;
     dialogueResolve = null;
     if (resolve) resolve();
+  }
+
+  function heldFor(now) {
+    return Math.max(0, now - heldSince, (nowMs() - heldMark) / 1000);
+  }
+
+  let heldMark = 0;
+
+  function markHeld(now) {
+    heldSince = now;
+    heldMark = nowMs();
   }
 
   function enterHeld(now, fresh) {
@@ -366,7 +417,7 @@ export function createSceneDirector(options) {
     lineId = null;
     currentKind = 'held';
     if (fresh) {
-      heldSince = now;
+      markHeld(now);
       nudged = false;
       noddedWait = false;
       patience = true;
@@ -389,11 +440,11 @@ export function createSceneDirector(options) {
       sceneId = list[sceneIndex] ? list[sceneIndex].id : null;
       mode = 'ambient';
       state = 'gap';
-      stateUntil = now + 0.45 + random() * 0.35;
+      arm(now, 0.45 + random() * 0.35);
     } else {
       mode = 'idle';
       state = 'gap';
-      stateUntil = now + 9999;
+      arm(now, 9999);
     }
   }
 
@@ -405,12 +456,12 @@ export function createSceneDirector(options) {
     hurry = false;
     if (farewellLine && finishedKind !== 'farewell') {
       hurry = true;
-      stateUntil = now;
+      arm(now, 0);
       return;
     }
     if (finishedKind === 'welcome') {
       mode = 'dialogue';
-      stateUntil = now + 0.28;
+      arm(now, 0.28);
       const resolve = welcomeResolve;
       welcomeResolve = null;
       if (resolve) resolve();
@@ -422,18 +473,14 @@ export function createSceneDirector(options) {
         visitorResolve = null;
         resolve(true);
       }
-      stateUntil = now + 99999;
-      if (suspendResolve) {
-        const resolve = suspendResolve;
-        suspendResolve = null;
-        resolve();
-      }
+      arm(now, 99999);
+      settleSuspend();
       return;
     }
     if (finishedKind === 'farewell') {
       if (pendingWelcome || mode === 'join') {
         hurry = true;
-        stateUntil = now;
+        arm(now, 0);
         return;
       }
       finishFarewell(now);
@@ -446,7 +493,7 @@ export function createSceneDirector(options) {
       resolve(true);
     }
     if (mode === 'dialogue' && dialogueQueue.length) {
-      stateUntil = now + Math.min(0.85, drawGap(finishedLine, dialogueQueue[0]));
+      arm(now, drawGap(finishedLine, dialogueQueue[0]));
       return;
     }
     if (mode === 'dialogue' && finishedKind === 'dialogue') {
@@ -460,16 +507,16 @@ export function createSceneDirector(options) {
     }
     if (mode === 'join') {
       hurry = true;
-      stateUntil = now;
+      arm(now, 0);
       return;
     }
     if (mode === 'idle') {
-      stateUntil = now + 9999;
+      arm(now, 9999);
       return;
     }
     let gap = drawGap(finishedLine, insertQueue.length ? insertQueue[0].line : peekAmbient());
     if (finishedKind === 'ambient' && endOfScene()) gap = Math.max(gap, 1.15 + random() * 0.65);
-    stateUntil = now + gap;
+    arm(now, gap);
   }
 
   function onGap(now) {
@@ -503,11 +550,11 @@ export function createSceneDirector(options) {
       return;
     }
     if (mode === 'idle') {
-      stateUntil = now + 9999;
+      arm(now, 9999);
       return;
     }
     if (mode !== 'ambient') {
-      stateUntil = now + 0.25;
+      arm(now, 0.25);
       return;
     }
     if (insertQueue.length) {
@@ -522,7 +569,7 @@ export function createSceneDirector(options) {
     }
     const line = takeAmbient();
     if (!line || !startLeadIn(line, 'ambient')) {
-      stateUntil = now + 0.8;
+      arm(now, 0.8);
     }
   }
 
@@ -546,7 +593,7 @@ export function createSceneDirector(options) {
     if (!booted) {
       booted = true;
       if (mode === 'ambient' && state === 'gap' && !hurry && !pendingWelcome) {
-        stateUntil = now + 0.45 + random() * 0.55;
+        arm(now, 0.45 + random() * 0.55);
       }
     }
     maintainGaze(now);
@@ -554,15 +601,15 @@ export function createSceneDirector(options) {
     if (state === 'held') serviceHeld(now);
     if (state === 'held' && (hurry || farewellLine || pendingWelcome)) {
       state = 'gap';
-      stateUntil = now;
+      arm(now, 0);
       hurry = true;
     }
-    if (state === 'gap' && (hurry || now >= stateUntil)) {
+    if (state === 'gap' && armed(now)) {
       hurry = false;
       onGap(now);
-    } else if (state === 'leadIn' && now >= stateUntil) {
+    } else if (state === 'leadIn' && armed(now)) {
       beginSpeaking(now);
-    } else if (state === 'tail' && now >= stateUntil) {
+    } else if (state === 'tail' && armed(now)) {
       onTail(now);
     }
     sampleOverlap();
@@ -570,27 +617,43 @@ export function createSceneDirector(options) {
 
   function requestJoin(text, zh) {
     return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(joinTimer);
+        joinTimer = 0;
+        resolve();
+      };
       notePark();
       if (currentKind !== 'farewell') farewellLine = null;
       mode = 'join';
       patience = false;
       dialogueQueue = [];
       releaseDialogue();
-      pendingWelcome = {
-        resolve,
-        line: {
-          id: 'welcome',
-          speaker: staffName(),
-          text: text || 'Oh, hi! Join us.',
-          zh: zh || '',
-          to: 'player',
-        },
+      const line = {
+        id: 'welcome',
+        speaker: staffName(),
+        text: text || 'Oh, hi! Join us.',
+        zh: zh || '',
+        to: 'player',
       };
-      if (!pendingWelcome.line.speaker) {
+      if (!line.speaker) {
         pendingWelcome = null;
-        resolve();
+        finish();
         return;
       }
+      pendingWelcome = { resolve: finish, line };
+      const running = state === 'speaking' || state === 'leadIn' || state === 'tail';
+      const extra = running && currentLine ? estimateLineDuration(currentLine.text) * 1.5 : 0;
+      const cap = (extra + estimateLineDuration(line.text) * 1.5 + 1.4) * 1000;
+      joinTimer = setTimeout(() => {
+        if (pendingWelcome && pendingWelcome.resolve === finish) pendingWelcome = null;
+        if (welcomeResolve === finish) welcomeResolve = null;
+        if (mode === 'join') mode = 'dialogue';
+        hurry = true;
+        finish();
+      }, Math.max(2200, cap));
       if (state === 'gap' || state === 'held') hurry = true;
     });
   }
@@ -642,8 +705,25 @@ export function createSceneDirector(options) {
         releaseDialogue();
         return;
       }
+      armPlayTimer();
       if ((state === 'gap' || state === 'held') && mode === 'dialogue') hurry = true;
     });
+  }
+
+  function armPlayTimer() {
+    clearTimeout(playTimer);
+    playTimer = 0;
+    if (!dialogueResolve || !dialogueQueue.length) return;
+    const budget = dialogueQueue.reduce((sum, line) => {
+      return sum + estimateLineDuration(line.text) * 1.5 + 2.6;
+    }, 1.2);
+    playTimer = setTimeout(() => {
+      if (!dialogueResolve) return;
+      dialogueQueue = [];
+      try { if (speakerNpc) speakerNpc.fadeBubble(0.3); } catch (err) { /* bubble already gone */ }
+      enterHeld(lastNow, true);
+      releaseDialogue();
+    }, Math.max(2000, budget * 1000));
   }
 
   function holdForPlayer() {
@@ -654,7 +734,7 @@ export function createSceneDirector(options) {
   function setPatience(on) {
     patience = !!on;
     if (patience) {
-      heldSince = lastNow;
+      markHeld(lastNow);
       nudged = false;
       noddedWait = false;
     }
@@ -680,27 +760,38 @@ export function createSceneDirector(options) {
     });
   }
 
+  function settleSuspend() {
+    clearTimeout(suspendTimer);
+    suspendTimer = 0;
+    if (!suspendResolve) return;
+    const resolve = suspendResolve;
+    suspendResolve = null;
+    resolve();
+  }
+
   function suspend() {
     notePark();
     mode = 'aside';
     patience = false;
     return new Promise((resolve) => {
       if (state === 'gap' || state === 'held') {
-        stateUntil = Math.max(stateUntil, lastNow + 99999);
+        arm(lastNow, 99999);
         resolve();
         return;
       }
       suspendResolve = resolve;
+      clearTimeout(suspendTimer);
+      suspendTimer = setTimeout(() => {
+        state = 'gap';
+        arm(lastNow, 99999);
+        settleSuspend();
+      }, 12000);
     });
   }
 
   function resume() {
     if (mode !== 'aside') return;
-    if (suspendResolve) {
-      const resolve = suspendResolve;
-      suspendResolve = null;
-      resolve();
-    }
+    settleSuspend();
     finishFarewell(lastNow);
   }
 
@@ -715,6 +806,7 @@ export function createSceneDirector(options) {
   function snapshot() {
     return {
       state,
+      mode,
       speaker: state === 'held' ? null : speaker,
       lineId: state === 'held' ? null : lineId,
       sceneId,
