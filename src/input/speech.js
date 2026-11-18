@@ -1,3 +1,5 @@
+import { estimateLineDuration } from '../dialogue/SceneDirector.js';
+
 /**
  * Push-to-talk wrapper around webkitSpeechRecognition / SpeechRecognition.
  * Unsupported browsers stay quiet and report status "unsupported".
@@ -124,6 +126,20 @@ function canSpeak() {
   return !!(window.speechSynthesis && typeof SpeechSynthesisUtterance === 'function');
 }
 
+/** A voice list of length 0 cannot play, and Chrome often never fires onend. */
+function voicesReady() {
+  if (!canSpeak() || typeof window.speechSynthesis.getVoices !== 'function') return false;
+  try {
+    return window.speechSynthesis.getVoices().length > 0;
+  } catch (err) {
+    return false;
+  }
+}
+
+function utteranceCapMs(text) {
+  return Math.round(estimateLineDuration(text) * 1.5 * 1000);
+}
+
 function dropJob(job) {
   if (!job || job.done) return;
   job.done = true;
@@ -167,7 +183,7 @@ function finishJob(job, cancelSynth) {
 
 function startJob(job) {
   const lane = lanes[job.lane];
-  if (!canSpeak()) {
+  if (!canSpeak() || !voicesReady()) {
     finishJob(job, false);
     return;
   }
@@ -181,12 +197,13 @@ function startJob(job) {
   if (picked) utter.voice = picked;
   else if (voices.length) utter.voice = voices[(job.voiceIndex || 0) % voices.length];
   lane.active = job;
-  const words = String(job.text || '').trim().split(/\s+/).filter(Boolean).length;
-  const cap = Math.min(9000, Math.max(1600, (Math.max(1.4, words / 2.6) * 1.8) * 1000));
-  job.timer = setTimeout(() => finishJob(job, true), cap);
+  job.timer = setTimeout(() => finishJob(job, true), utteranceCapMs(job.text));
   utter.onend = () => finishJob(job, false);
   utter.onerror = () => finishJob(job, false);
   try {
+    if (window.speechSynthesis.paused && typeof window.speechSynthesis.resume === 'function') {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.speak(utter);
   } catch (err) {
     finishJob(job, false);
@@ -219,7 +236,7 @@ export function speakLine(text, voiceIndex, options = {}) {
   const laneName = options.lane === 'ambient' ? 'ambient' : 'foreground';
   return new Promise((resolve) => {
     const clean = String(text || '').trim();
-    if (!clean || !canSpeak()) {
+    if (!clean || !canSpeak() || !voicesReady()) {
       resolve();
       return;
     }
