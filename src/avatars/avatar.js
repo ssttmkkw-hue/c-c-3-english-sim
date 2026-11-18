@@ -66,17 +66,17 @@ export function animateAvatar(avatar, dt, moving, speed, state) {
   avatar.legR.rotation.x = -swing * 0.75;
   avatar.body.position.y = (moving ? Math.abs(Math.sin(state.phase)) * 0.07 : 0) + breathe;
 
-  const waving = state.react === 'wave';
-  if (!waving) {
+  const posing = state.react === 'wave' || state.react === 'phone' || state.react === 'stretch';
+  if (!posing) {
     avatar.armL.rotation.x = -swing * 0.55;
     avatar.armR.rotation.x = swing * 0.55;
     avatar.armL.rotation.z += (0 - avatar.armL.rotation.z) * 0.2;
     avatar.armR.rotation.z += (0 - avatar.armR.rotation.z) * 0.2;
-  } else {
+  } else if (state.react === 'wave') {
     avatar.armL.rotation.x = -swing * 0.2;
   }
 
-  if (state.speaking && !waving && state.react !== 'jump') {
+  if (state.speaking && !posing && state.react !== 'jump') {
     const g = Math.sin(state.phase * 2.5);
     avatar.body.position.y += 0.045 * Math.sin(state.phase * 2.15);
     avatar.armR.rotation.x = -0.48 + g * 0.34;
@@ -96,14 +96,34 @@ export function animateAvatar(avatar, dt, moving, speed, state) {
     state.reactT -= dt;
     avatar.armR.rotation.x = -1.15;
     avatar.armR.rotation.z = -0.35 + Math.sin(state.reactT * 18) * 0.55;
-    if (state.reactT <= 0) {
-      state.react = null;
-      avatar.armR.rotation.x = 0;
-      avatar.armR.rotation.z = 0;
-    }
+    if (state.reactT <= 0) clearPose(avatar, state);
+  } else if (state.react === 'phone') {
+    state.reactT -= dt;
+    avatar.armR.rotation.x = -1.25;
+    avatar.armR.rotation.z = -0.45;
+    avatar.head.rotation.x = 0.42;
+    if (state.reactT <= 0) clearPose(avatar, state);
+  } else if (state.react === 'stretch') {
+    state.reactT -= dt;
+    const k = Math.sin(Math.min(1, Math.max(state.reactT, 0) / 1.6) * Math.PI);
+    avatar.armL.rotation.x = -2.2 * k;
+    avatar.armR.rotation.x = -2.2 * k;
+    avatar.armL.rotation.z = 0.35 * k;
+    avatar.armR.rotation.z = -0.35 * k;
+    avatar.head.rotation.x = -0.15 * k;
+    if (state.reactT <= 0) clearPose(avatar, state);
   } else {
     avatar.head.rotation.x *= 0.86;
   }
+}
+
+function clearPose(avatar, state) {
+  state.react = null;
+  avatar.armL.rotation.x = 0;
+  avatar.armR.rotation.x = 0;
+  avatar.armL.rotation.z = 0;
+  avatar.armR.rotation.z = 0;
+  avatar.head.rotation.x = 0;
 }
 
 /** Turn the head toward a world-space point. Body yaw stays on the root. */
@@ -141,6 +161,12 @@ export function triggerReact(state, kind) {
   } else if (kind === 'wave') {
     state.react = 'wave';
     state.reactT = 0.9;
+  } else if (kind === 'phone') {
+    state.react = 'phone';
+    state.reactT = 2.1;
+  } else if (kind === 'stretch') {
+    state.react = 'stretch';
+    state.reactT = 1.6;
   } else {
     state.react = 'nod';
     state.reactT = 0.7;

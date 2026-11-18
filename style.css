@@ -35,13 +35,13 @@ html, body {
   align-items: center;
   flex-wrap: wrap;
 }
-#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn, #settings-btn {
+#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn, #settings-btn, #notebook-btn {
   background: rgba(16, 32, 39, 0.78);
   color: #fff;
   border-radius: 12px;
 }
 #stats { padding: 8px 12px; font-size: 13px; }
-#help-btn, #settings-btn {
+#help-btn, #settings-btn, #notebook-btn {
   border: 0;
   width: 36px;
   height: 36px;
@@ -120,7 +120,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
 #end-box { margin: 8px 0; }
 #end-box p { margin: 0 0 8px; font-weight: 700; }
 #end-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-#chooser, #settings, #help {
+#chooser, #settings, #help, #practice, #notebook {
   position: fixed;
   inset: 0;
   background: rgba(16, 32, 39, 0.45);
@@ -131,7 +131,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   z-index: 5;
   padding: 16px;
 }
-#help-card, #chooser-card, #settings-card {
+#help-card, #chooser-card, #settings-card, #practice-card, #notebook-card {
   width: min(520px, 100%);
   background: #102027;
   color: #fff;
@@ -140,7 +140,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   max-height: min(80vh, 640px);
   overflow: auto;
 }
-#help-card h2, #chooser-card h2, #settings-card h2 { margin: 0 0 10px; font-size: 20px; }
+#help-card h2, #chooser-card h2, #settings-card h2, #practice-card h2, #notebook-card h2 { margin: 0 0 10px; font-size: 20px; }
 #chooser-note { margin: 0 0 10px; color: #ffe082; min-height: 0; }
 #chooser-note:empty { display: none; }
 #chooser-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -190,7 +190,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   align-items: flex-start;
   text-align: left;
 }
-#choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close {
+#choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close, #practice-actions button, #practice-form button, #notebook-close, .note-actions button {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;
@@ -200,6 +200,13 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   cursor: pointer;
 }
 #say-form { display: flex; gap: 8px; flex-wrap: wrap; }
+#mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+#mic-btn .mic-icon { flex: 0 0 auto; display: block; }
 #say {
   flex: 1 1 180px;
   border-radius: 999px;
@@ -257,7 +264,7 @@ body.chatting #touch { display: none !important; }
   #top-main, #top-extra { flex-wrap: nowrap; gap: 6px; max-width: 100%; }
   #zone-name { padding: 6px 8px; font-size: 13px; }
   #mic-state { padding: 6px 8px; font-size: 12px; }
-  #help-btn, #settings-btn { width: 32px; height: 32px; }
+  #help-btn, #settings-btn, #notebook-btn { width: 32px; height: 32px; }
   #stats, #tts-label {
     padding: 3px 8px;
     font-size: 11px;
@@ -280,10 +287,14 @@ body.chatting #touch { display: none !important; }
     overflow: hidden;
   }
   #chat-scroll { max-height: none; flex: 1 1 auto; min-height: 0; }
-  #say { flex: 1 1 100%; min-width: 0; }
-  #say-form { flex-wrap: wrap; gap: 6px; }
+  #say { grid-column: 1 / -1; min-width: 0; width: 100%; flex: none; }
+  #say-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
   #say-form button, #mic-btn {
-    flex: 1 1 0;
+    width: 100%;
     min-width: 0;
     min-height: 44px;
     padding: 8px 6px;
@@ -293,4 +304,92 @@ body.chatting #touch { display: none !important; }
   #touch-actions { right: 10px; bottom: 8px; }
   #touch-actions button { min-width: 112px; }
   #stick { left: 10px; width: 108px; height: 108px; }
+  #missions {
+    top: 92px;
+    left: 10px;
+    bottom: auto;
+    width: min(200px, 52vw);
+    font-size: 11px;
+    max-height: 22vh;
+  }
+  body.chatting #missions { display: none; }
+  #ambient { top: 168px; }
+  #toast { top: 112px; max-width: 92vw; }
 }
+#missions {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: min(280px, 34vw);
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(16, 32, 39, 0.78);
+  color: #fff;
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.mission-head { margin: 0 0 4px; color: #ffe082; font-weight: 700; }
+.mission { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.mission.done { color: #b9f6ca; }
+.mission-count { margin-left: auto; color: #b3e5fc; }
+.mission-zh { flex-basis: 100%; color: #ffe082; font-size: 11px; }
+#toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  background: #102027;
+  color: #fff;
+  border-radius: 16px;
+  padding: 10px 16px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 210px));
+  text-align: center;
+  line-height: 1.35;
+}
+#confetti {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 7;
+  pointer-events: none;
+}
+#practice-phrase { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
+#practice-zh { margin: 0 0 8px; color: #ffe082; }
+#practice-words { display: flex; flex-wrap: wrap; gap: 6px; min-height: 1.4em; margin: 8px 0; }
+.word-ok { color: #66bb6a; font-weight: 700; }
+.word-miss { color: #ef5350; font-weight: 700; }
+#practice-stars { margin: 6px 0; font-size: 18px; letter-spacing: 0.08em; }
+#practice-heard { margin: 0 0 8px; color: #b3e5fc; min-height: 1.2em; }
+#practice-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#practice-form { display: flex; gap: 8px; flex: 1 1 220px; }
+#practice-input {
+  flex: 1;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+}
+#notebook-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.note-card { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 10px; }
+.note-text { margin: 0 0 4px; font-weight: 700; }
+.note-zh, .note-meta { margin: 0 0 6px; color: #ffe082; font-size: 13px; }
+.note-meta { color: #b3e5fc; }
+.note-actions { display: flex; gap: 8px; }
+.note-delete { background: #eceff1 !important; }
+#chat-log .recap-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; }
+#chat-log button.practice-link, #chat-log button.save-phrase, #choices button.save-phrase {
+  background: transparent;
+  color: #ffe082;
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-weight: 700;
+}
+#choices { align-items: stretch; }
+.choice-row { display: flex; gap: 4px; align-items: stretch; max-width: 100%; }
+.choice-row .choice { flex: 1; }
+#choices button.save-phrase { flex: 0 0 auto; align-self: center; }
+body.chatting #missions { bottom: auto; top: 64px; }

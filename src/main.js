@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createScene } from './world/scene.js';
+import { createAmbience } from './world/ambience.js';
 import { zoneAt } from './world/zones.js';
 import { ZONES } from './world/zones.js';
 import { CHARACTERS } from './data/characters.js';
@@ -15,6 +16,9 @@ import { createSpeechInput, speakLine, stopSpeaking } from './input/speech.js';
 import { createHUD } from './ui/hud.js';
 import { DialogueEngine } from './dialogue/DialogueEngine.js';
 import { ScriptedProvider } from './dialogue/ScriptedProvider.js';
+import { alignPhrase, normalize } from './dialogue/match.js';
+import { createNotebook } from './progress/notebook.js';
+import { createMissions } from './progress/missions.js';
 // AIProvider in ./dialogue/AIProvider.js is an unwired stub (no API key).
 
 const canvas = document.querySelector('#view');
@@ -26,6 +30,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const { scene, colliders } = createScene();
+const ambience = createAmbience(scene);
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 120);
 
 const zoneById = Object.fromEntries(ZONES.map((zone) => [zone.id, zone]));
@@ -64,6 +69,9 @@ const touch = createTouch(document.body);
 const speech = createSpeechInput();
 const hud = createHUD();
 const engine = new DialogueEngine(new ScriptedProvider(GRAPHS));
+const notebook = createNotebook();
+const missions = createMissions();
+const zhIndex = buildZhIndex(GRAPHS);
 
 let yaw = 2.2;
 let pitch = 0.55;
@@ -75,6 +83,7 @@ let micHeld = false;
 let lastNpcLine = '';
 let choiceList = [];
 let pendingReply = null;
+let practicePhrase = null;
 const STATS_KEY = 'plaza-english-stats';
 const stats = loadStats();
 
@@ -110,11 +119,62 @@ const mapCanvas = document.querySelector('#minimap');
 const mapCtx = mapCanvas.getContext('2d');
 
 hud.setMic(speech.supported ? 'idle' : 'unsupported');
+hud.setSavedCheck((text) => notebook.has(text));
+hud.setMissions(missions.get());
 speech.setHandler((info) => {
   hud.setMic(speech.supported ? info.status : 'unsupported');
-  if (info.status === 'listening') hud.setTranscript(`${info.finalText} ${info.interim}`.trim());
+  const line = `${info.finalText} ${info.interim}`.trim();
+  if (hud.practiceOpen()) {
+    hud.setPracticeTranscript(info.status === 'listening' ? line : '');
+    return;
+  }
+  if (info.status === 'listening') hud.setTranscript(line);
   else hud.setTranscript('');
 });
+
+function buildZhIndex(graphs) {
+  const map = new Map();
+  const put = (text, zh) => {
+    if (!text || !zh) return;
+    const key = normalize(text);
+    if (key && !map.has(key)) map.set(key, zh);
+  };
+  for (const graph of Object.values(graphs)) {
+    for (const node of Object.values(graph.nodes || {})) {
+      for (const line of node.lines || []) {
+        if (line && typeof line === 'object') put(line.text, line.zh);
+      }
+      for (const choice of node.choices || []) put(choice.text, choice.zh);
+    }
+  }
+  return map;
+}
+
+function zhFor(text) {
+  return zhIndex.get(normalize(text)) || '';
+}
+
+function sourceLabel() {
+  if (!session) return '';
+  const meta = GROUP_CONVERSATIONS.find((item) => item.id === session.conversationId);
+  if (meta) return meta.title;
+  const npc = session.members[0];
+  return npc ? npc.def.name : session.conversationId;
+}
+
+function refreshMissions(result) {
+  hud.setMissions(missions.get());
+  if (!result || !result.newly || !result.newly.length) return;
+  const names = result.newly.map((mission) => mission.title).join(', ');
+  const text = result.allDone
+    ? `All daily missions done (全部完成) · streak ${missions.get().streak}`
+    : `Mission complete: ${names}`;
+  hud.celebrate(text);
+}
+
+function refreshNotebook() {
+  if (hud.notebookOpen()) hud.renderNotebook(notebook.list());
+}
 
 function wait(ms) {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -167,6 +227,7 @@ async function playTurn(turn, token, source) {
     if (source === 'voice') {
       stats.voiceMatches += 1;
       saveStats();
+      refreshMissions(missions.noteVoice());
     }
   }
   hud.setTyping(false);
@@ -175,12 +236,14 @@ async function playTurn(turn, token, source) {
   if (turn.ended) {
     choiceList = [];
     hud.setChoices([]);
+    rememberPhrases(turn.phrases || []);
     hud.addRecap(turn.phrases || []);
     hud.showEnd(true);
     if (!session.counted) {
       session.counted = true;
       stats.conversations += 1;
       saveStats();
+      refreshMissions(missions.noteGroupEnd(session.mission));
     }
     pendingReply = null;
     hud.setWaiting(false);
@@ -215,10 +278,13 @@ function formCircle(members) {
 }
 
 async function openConversation(conversationId, mode, members) {
+  hud.setChooser(false);
+  if (hud.practiceOpen()) hud.closePractice();
   if (session) return;
   playToken += 1;
   const token = playToken;
   const zone = zoneAt(player.avatar.root.position.x, player.avatar.root.position.z);
+  const meta = GROUP_CONVERSATIONS.find((item) => item.id === conversationId);
   session = {
     conversationId,
     mode,
@@ -227,6 +293,12 @@ async function openConversation(conversationId, mode, members) {
     ended: false,
     confirming: false,
     lastSpoken: '',
+    mission: {
+      mode,
+      zone: zone.id,
+      level: meta ? meta.level : '',
+      characterId: members[0] ? members[0].def.id : '',
+    },
     context: {
       conversationId,
       zoneId: zone.id,
@@ -234,6 +306,7 @@ async function openConversation(conversationId, mode, members) {
       mode,
     },
   };
+  if (mode === 'solo') refreshMissions(missions.noteSolo(session.mission.characterId));
   for (const npc of members) {
     if (npc.def.group && groups[npc.def.group]) groups[npc.def.group].paused = true;
   }
@@ -253,6 +326,7 @@ async function openConversation(conversationId, mode, members) {
 }
 
 function closeConversation() {
+  hud.setChooser(false);
   if (!session) return;
   playToken += 1;
   for (const npc of session.members) {
@@ -296,9 +370,43 @@ function firstWords(text) {
   return words.length > count ? `${cut}…` : cut;
 }
 
+function rememberPhrases(phrases) {
+  const source = sourceLabel() || 'Conversation';
+  const conversationId = session ? session.conversationId : '';
+  for (const phrase of phrases) {
+    const text = typeof phrase === 'string' ? phrase : phrase && phrase.text;
+    if (!text) continue;
+    const zh = typeof phrase === 'object' && phrase.zh ? phrase.zh : zhFor(text);
+    notebook.add({ text, zh, source, conversationId });
+  }
+}
+
+function openPractice(text, zh) {
+  const phrase = String(text || '').trim();
+  if (!phrase) return false;
+  practicePhrase = { text: phrase, zh: zh || zhFor(phrase) };
+  hud.openPractice(practicePhrase.text, practicePhrase.zh, speech.supported);
+  speakLine(practicePhrase.text, 0, voiceOptions());
+  return true;
+}
+
+function scorePractice(heard) {
+  if (!practicePhrase) return;
+  const result = alignPhrase(practicePhrase.text, heard);
+  hud.showPracticeResult(result, heard);
+  notebook.record(practicePhrase.text, result.score);
+  refreshNotebook();
+  refreshMissions(missions.notePractice());
+}
+
+function toggleNotebook() {
+  if (hud.notebookOpen()) hud.setNotebook(false);
+  else hud.showNotebook(notebook.list());
+}
+
 function submitText(text, source, zh) {
   const clean = String(text || '').trim();
-  if (!session || !clean || session.ended) return;
+  if (hud.practiceOpen() || !session || !clean || session.ended) return;
   if (session.busy) {
     pendingReply = { text: clean, source: source || 'text' };
     hud.setWaiting(true);
@@ -326,6 +434,34 @@ hud.onHint(() => {
   const choices = engine.currentChoices();
   hud.showHints(choices.map((choice) => firstWords(choice.text)));
 });
+hud.onSave((text, zh) => {
+  notebook.add({
+    text,
+    zh: zh || zhFor(text),
+    source: sourceLabel() || 'Chat',
+    conversationId: session ? session.conversationId : '',
+  });
+  hud.toast('Saved to notebook (已保存)');
+  refreshNotebook();
+});
+hud.onPractice((text, zh) => openPractice(text, zh));
+hud.onPracticePlay(() => {
+  if (practicePhrase) speakLine(practicePhrase.text, 0, voiceOptions());
+});
+hud.onPracticeSubmit((text) => scorePractice(text));
+hud.onPracticeClose(() => {
+  stopSpeaking();
+  practicePhrase = null;
+  if (micHeld) {
+    speech.stop();
+    micHeld = false;
+  }
+});
+hud.onNotebookToggle(() => toggleNotebook());
+hud.onNotebookRemove((id) => {
+  notebook.remove(id);
+  refreshNotebook();
+});
 hud.onRetry(() => {
   if (!session || session.ended) return;
   if (session.confirming) {
@@ -340,7 +476,8 @@ hud.onRetry(() => {
 });
 
 function holdMic() {
-  if (!session || !speech.supported || micHeld) return;
+  const practicing = hud.practiceOpen();
+  if ((!practicing && !session) || !speech.supported || micHeld) return;
   micHeld = true;
   speech.start();
 }
@@ -348,18 +485,28 @@ function releaseMic() {
   if (!micHeld) return;
   micHeld = false;
   const text = speech.stop();
+  if (hud.practiceOpen()) {
+    if (text) scorePractice(text);
+    return;
+  }
   if (text) submitText(text, 'voice');
 }
-hud.micBtn.addEventListener('pointerdown', (event) => {
-  event.preventDefault();
-  holdMic();
-});
-hud.micBtn.addEventListener('pointerup', releaseMic);
-hud.micBtn.addEventListener('pointerleave', releaseMic);
+function bindHold(button) {
+  button.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    holdMic();
+  });
+  button.addEventListener('pointerup', releaseMic);
+  button.addEventListener('pointerleave', releaseMic);
+  button.addEventListener('pointercancel', releaseMic);
+}
+bindHold(hud.micBtn);
+bindHold(hud.practiceMicBtn);
 
 function keyName(event) {
   if (event.code === 'Escape' || event.key === 'Escape') return 'esc';
   if (event.code === 'KeyH' || event.key === 'h' || event.key === 'H' || event.key === '?') return 'help';
+  if (event.code === 'KeyN' || event.key === 'n' || event.key === 'N') return 'notebook';
   if (event.code === 'Space' || event.key === ' ') return 'space';
   return '';
 }
@@ -367,9 +514,22 @@ function keyName(event) {
 window.addEventListener('keydown', (event) => {
   if (event.repeat) return;
   const name = keyName(event);
+  if (!keyboard.typing() && name === 'notebook') {
+    toggleNotebook();
+    eatKey = 'notebook';
+    event.preventDefault();
+    return;
+  }
   if (hud.uiLocked()) {
+    if (name === 'space' && hud.practiceOpen() && !keyboard.typing()) {
+      holdMic();
+      event.preventDefault();
+      return;
+    }
     if (name === 'esc' || (name === 'help' && hud.helpOpen() && !keyboard.typing())) {
       if (hud.helpOpen()) hud.setHelp(false);
+      else if (hud.practiceOpen()) hud.closePractice();
+      else if (hud.notebookOpen()) hud.setNotebook(false);
       else if (hud.settingsOpen()) hud.setSettingsOpen(false);
       else hud.setChooser(false);
       eatKey = name;
@@ -398,6 +558,14 @@ window.addEventListener('keyup', (event) => {
   if (name === 'esc') {
     if (hud.helpOpen()) {
       hud.setHelp(false);
+      return;
+    }
+    if (hud.practiceOpen()) {
+      hud.closePractice();
+      return;
+    }
+    if (hud.notebookOpen()) {
+      hud.setNotebook(false);
       return;
     }
     if (hud.settingsOpen()) {
@@ -602,6 +770,7 @@ function loop() {
   }
   updateVisitors(dt);
   updateAmbient(dt, pos.x, pos.z);
+  ambience.update(dt);
   applyLooks(speakerNpc, pos);
 
   const zone = zoneAt(pos.x, pos.z);
@@ -1010,9 +1179,24 @@ window.__sim = {
       choices: choiceList.map((choice) => choice.text),
       confirming: !!(session && session.confirming),
       chooserOpen: hud.chooserOpen(),
+      practiceOpen: hud.practiceOpen(),
+      notebookOpen: hud.notebookOpen(),
       settings: hud.getSettings(),
     };
   },
+  notebook: {
+    list: () => notebook.list(),
+    add: (entry) => notebook.add(entry),
+    remove: (id) => {
+      const ok = notebook.remove(id);
+      refreshNotebook();
+      return ok;
+    },
+  },
+  missions: {
+    get: () => missions.get(),
+  },
+  practice: (phraseText) => openPractice(phraseText),
   teleportTo,
   join: tryJoin,
   chat: tryChat,

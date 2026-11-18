@@ -40,6 +40,7 @@ export function createNPC(def, anchor, colliders) {
     goal: null,
     look: null,
     speaking: false,
+    fidget: 4 + Math.random() * 8,
   };
 
   function say(text, now) {
@@ -154,6 +155,13 @@ export function createNPC(def, anchor, colliders) {
       if (!moved) state.wanderTarget = null;
       face(state.wanderTarget ? state.wanderTarget.x : p.x + dx, state.wanderTarget ? state.wanderTarget.z : p.z + dz);
       moving = moved;
+    }
+    if (!paused && !moving && !state.speaking && !state.goal && !state.react) {
+      state.fidget -= dt;
+      if (state.fidget <= 0) {
+        state.fidget = 8 + Math.random() * 10;
+        triggerReact(state, Math.random() < 0.5 ? 'phone' : 'stretch');
+      }
     }
     animateAvatar(avatar, dt, moving, speed, state);
     if (state.look) lookHeadAt(avatar, state.look.x, state.look.z, dt);

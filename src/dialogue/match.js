@@ -274,3 +274,40 @@ export function matchChoice(userText, choices) {
 export function confidentEnough(confidence) {
   return confidence >= MATCH_ACCEPT;
 }
+
+/**
+ * Word-level listen-and-repeat score.
+ * Each display word is green when a heard token matches (exact, synonym, or a small typo).
+ * @returns {{ score: number, stars: number, words: { text: string, ok: boolean }[] }}
+ */
+export function alignPhrase(targetText, heardText) {
+  const display = String(targetText || '').trim().split(/\s+/).filter(Boolean);
+  const heard = normalize(heardText).split(' ').filter(Boolean);
+  const used = new Array(heard.length).fill(false);
+  const words = display.map((text) => {
+    const parts = normalize(text).split(' ').filter(Boolean);
+    if (!parts.length) return { text, ok: true };
+    let hits = 0;
+    for (const part of parts) {
+      let bestI = -1;
+      let best = 0;
+      for (let i = 0; i < heard.length; i++) {
+        if (used[i]) continue;
+        const score = wordScore(heard[i], part);
+        if (score > best) {
+          best = score;
+          bestI = i;
+        }
+      }
+      if (best >= 0.8 && bestI >= 0) {
+        used[bestI] = true;
+        hits += 1;
+      }
+    }
+    return { text, ok: hits === parts.length };
+  });
+  const matched = words.filter((word) => word.ok).length;
+  const score = words.length ? Math.round((matched / words.length) * 100) / 100 : 0;
+  const stars = score >= 0.92 ? 3 : score >= 0.67 ? 2 : score >= 0.34 ? 1 : 0;
+  return { score, stars, words };
+}
