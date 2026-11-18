@@ -4,6 +4,15 @@ A static, VRChat-style plaza for beginner–intermediate English practice. Avata
 
 一个静态的、类似 VRChat 的英语练习广场，面向初学者到中级学习者。人物、路牌和道具都用 Three.js 程序化生成。不需要构建，不使用受版权保护的资源包，仓库里也不放任何 API key。
 
+## Features / 功能
+
+- Leveled group chats and 1-on-1 talks. Reply by tapping a choice, typing, or holding Space to speak. 小组对话和一对一，分初级和中级。可以点选项、打字，或按住空格说话。
+- Listen & Repeat scores each word. Contractions match their expanded form (`I'd` / `I would`, `don't` / `do not`). 跟读练习按词打分。缩写和完整形式算同一句。
+- A phrase notebook (N) saves useful lines, with Chinese when we have it. 笔记本（N）保存好用的句子，并带中文。
+- Three daily missions, with a streak when you finish all of them. On a phone they collapse to a `Today 0/3` pill. 每天三个任务。手机上收成 `Today 0/3` 小胶囊。
+- Avatar panel in Settings: display name (default You), body color, and hair style, saved on this browser. 设置里的形象：名字（默认 You）、衣服颜色、发型，存在本地。
+- A short 3-step tip the first time you close the help card. 第一次关掉帮助后，有三步可跳过的提示。
+
 ## Run / 运行
 
 ```bash
@@ -27,8 +36,9 @@ Open `http://localhost:8000`.
 - **Leave / 离开:** **Esc** or **Leave**. The group goes back to its own ambient chat. Esc also closes the chooser, practice, notebook, settings, and the help card. Starting or leaving a conversation closes the chooser too. Esc 也会关闭选择列表、跟读、笔记本、设置和帮助。开始或离开对话时，选择列表会关掉。
 - **Listen & Repeat / 跟读练习:** At the end of a chat, each useful phrase has **Practice**. The notebook has the same button. The app reads the line with your voice and speed settings (`speechSynthesis`). Hold **Space** or **Hold to speak**, or type the line if there is no microphone. Matched words turn green, missed words turn red, and you get a star rating. 对话结束或在笔记本里点 Practice。应用按你的语音和语速朗读，然后你按住说话或打字。对上的词是绿色，没对上的是红色，并给出星级。
 - **Notebook / 笔记本:** **N** or the book button. Useful phrases from a finished chat are saved automatically. **☆** on an NPC line or a reply saves that line too. Each entry shows Chinese (when we have it), where it came from, how many times you practiced it, and your best score. You can practice or delete it. Saved in `localStorage`. 按 N 或笔记本按钮。完成对话后的好用句子会自动记下，聊天里点 ☆ 也能保存。
-- **Daily missions / 每日任务:** Three missions for the local day, chosen from a fixed pool (for example a beginner cafe chat, three voice replies, a new 1-on-1, two listen-and-repeat phrases, or an intermediate chat). A small panel shows progress. Finishing one shows a toast and a short burst of confetti. Progress resets the next local day. A streak counts days you clear all three. 每天三个任务，进度在左侧。完成时有提示和一点彩纸。第二天重置，连续完成会记天数。
-- **Settings / 设置:** The gear button. Read-aloud on/off, an English voice, speaking speed, 3D subtitle bubbles, **中文翻译**, and a difficulty preference. Saved in `localStorage`. The same voice and speed are used for Listen & Repeat. 齿轮按钮：朗读、英语语音、语速、立体字幕、中文翻译、难度偏好，都存在本地。跟读练习用同一套语音和语速。
+- **Daily missions / 每日任务:** Three missions for the local day, chosen from a fixed pool (for example a beginner cafe chat, three voice replies, a new 1-on-1, two listen-and-repeat phrases, or an intermediate chat). A small panel shows progress. On a narrow screen it is a pill labeled `Today 0/3` that opens the list when tapped, and Nearby talk is a single line, so the two do not cover each other. Finishing one shows a toast and a short burst of confetti. Progress resets the next local day. A streak counts days you clear all three. 每天三个任务。窄屏上是 `Today 0/3` 胶囊，点开才看到列表；附近对话收成一行，避免叠在一起。完成时有提示和一点彩纸。第二天重置，连续完成会记天数。
+- **Settings / 设置:** The gear button. Read-aloud on/off, an English voice, speaking speed, 3D subtitle bubbles, **中文翻译**, a difficulty preference, and an **Avatar** panel (name, body color, hair). Saved in `localStorage`. The same voice and speed are used for Listen & Repeat. The name tag above you uses the name you pick (default You). 齿轮按钮：朗读、英语语音、语速、立体字幕、中文翻译、难度偏好，以及形象（名字、衣服颜色、发型），都存在本地。跟读练习用同一套语音和语速。头顶名字用你选的名字，默认是 You。
+- **Tips / 入门提示:** The first time you close this help card, three short tips appear: walk to a group, press E, then reply by voice or by tapping a choice. Skip or Esc remembers that you finished them. 第一次关闭帮助后，会出现三步提示：走到人群、按 E、用语音或点击回答。跳过或按 Esc 之后不再出现。
 - **Read aloud / 朗读:** Uses `speechSynthesis`. Off by default. The header checkbox and the settings panel stay in sync. 默认关闭。顶栏和设置面板是同一个开关。
 - **中文翻译:** Off by default. When it is on, each NPC line and each reply choice shows Chinese underneath. 默认关闭。打开后，每句 NPC 台词和每个回答选项下面都会显示中文。
 - **Minimap / 小地图:** Top-right. Zones, group anchors, other people, and you.
@@ -48,7 +58,7 @@ Push-to-talk uses the browser Web Speech API (`SpeechRecognition` / `webkitSpeec
 - `index.html`, `style.css` — page, HUD, favicon (inline SVG, so `/favicon.ico` is not requested).
 - `src/main.js` — loop, camera, groups, `window.__sim`.
 - `src/world/` — plaza zones, props, entrance signs.
-- `src/avatars/` — procedural bodies, idle/walk, emotes, speech bubbles.
+- `src/avatars/` — procedural bodies (hair, face, clothes), idle/walk, emotes, a glow under whoever is speaking, speech bubbles.
 - `src/input/` — keyboard (`event.code`, with `event.key` fallback), mouse orbit, touch stick, speech.
 - `src/ui/hud.js` — zone, chat log, choices, mic state, chooser, settings, notebook, practice, daily missions.
 - `src/dialogue/` — engine, providers, and `match.js` (reply scores and listen-and-repeat word alignment).
