@@ -57,3 +57,55 @@ export function blocked(x, z, radius, colliders) {
   }
   return false;
 }
+
+/** How deep (x, z) sits inside any body circle. 0 means clear. */
+export function overlapAmount(x, z, radius, bodies) {
+  if (!bodies) return 0;
+  let pen = 0;
+  for (const body of bodies) {
+    const min = radius + body.r;
+    const dist = Math.hypot(x - body.x, z - body.z);
+    if (dist < min) pen = Math.max(pen, min - dist);
+  }
+  return pen;
+}
+
+/**
+ * Push a circle out of overlapping bodies. A full overlap uses fallbackAngle
+ * so two bodies on the same point do not pick the same direction and stay stuck.
+ */
+export function pushOutOfBodies(x, z, radius, bodies, colliders, fallbackAngle) {
+  const list = bodies || [];
+  const walls = colliders || [];
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = false;
+    for (const body of list) {
+      let dx = x - body.x;
+      let dz = z - body.z;
+      let dist = Math.hypot(dx, dz);
+      const min = radius + body.r;
+      if (dist >= min - 1e-5) continue;
+      if (dist < 1e-5) {
+        const ang = fallbackAngle || 0;
+        dx = Math.cos(ang);
+        dz = Math.sin(ang);
+        dist = 1;
+      }
+      const push = min - dist + 0.03;
+      let nx = x + (dx / dist) * push;
+      let nz = z + (dz / dist) * push;
+      if (blocked(nx, nz, radius, walls)) {
+        if (!blocked(nx, z, radius, walls)) nz = z;
+        else if (!blocked(x, nz, radius, walls)) nx = x;
+        else continue;
+      }
+      if (nx !== x || nz !== z) {
+        x = nx;
+        z = nz;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return { x, z };
+}

@@ -1,6 +1,15 @@
 import { animateAvatar, createAvatar, lookHeadAt, triggerReact } from './avatar.js';
-import { blocked } from '../world/zones.js';
+import { blocked, overlapAmount, pushOutOfBodies } from '../world/zones.js';
 import { setBubbleText } from './speechbubble.js';
+
+const SPAWN_CLEAR = 2;
+
+function clearOfPlayerSpawn(x, z) {
+  const dist = Math.hypot(x, z);
+  if (dist >= SPAWN_CLEAR) return { x, z };
+  const ang = dist < 1e-4 ? 0.9 : Math.atan2(z, x);
+  return { x: Math.cos(ang) * SPAWN_CLEAR, z: Math.sin(ang) * SPAWN_CLEAR };
+}
 
 export function createNPC(def, anchor, colliders) {
   const avatar = createAvatar(def);
@@ -10,6 +19,10 @@ export function createNPC(def, anchor, colliders) {
   if (!def.wander) {
     x = anchor[0] + Math.sin(def.angle) * 1.85;
     z = anchor[1] + Math.cos(def.angle) * 1.85;
+  } else {
+    const spot = clearOfPlayerSpawn(x, z);
+    x = spot.x;
+    z = spot.z;
   }
   avatar.root.position.set(x, 0, z);
   const faceX = def.wander ? x + 1 : anchor[0];
@@ -50,29 +63,48 @@ export function createNPC(def, anchor, colliders) {
     state.goal = null;
   }
 
-  function hitsBody(x, z, bodies) {
-    if (!bodies) return false;
-    for (const body of bodies) {
-      const dx = x - body.x;
-      const dz = z - body.z;
-      const min = radius + body.r;
-      if (dx * dx + dz * dz < min * min) return true;
-    }
-    return false;
+  function canStand(x, z, bodies) {
+    if (blocked(x, z, radius, colliders)) return false;
+    const before = overlapAmount(avatar.root.position.x, avatar.root.position.z, radius, bodies);
+    const after = overlapAmount(x, z, radius, bodies);
+    if (after <= 0) return true;
+    return after < before - 1e-4;
+  }
+
+  function deeperIntoSpawn(x, z) {
+    if (!def.wander || state.goal) return false;
+    const next = Math.hypot(x, z);
+    if (next >= SPAWN_CLEAR) return false;
+    const cur = Math.hypot(avatar.root.position.x, avatar.root.position.z);
+    return next <= cur + 1e-4;
   }
 
   function tryStep(nx, nz, bodies) {
     const p = avatar.root.position;
     let moved = false;
-    if (!blocked(nx, p.z, radius, colliders) && !hitsBody(nx, p.z, bodies)) {
+    if (canStand(nx, p.z, bodies) && !deeperIntoSpawn(nx, p.z)) {
       avatar.root.position.x = nx;
       moved = true;
     }
-    if (!blocked(avatar.root.position.x, nz, radius, colliders) && !hitsBody(avatar.root.position.x, nz, bodies)) {
+    if (canStand(avatar.root.position.x, nz, bodies) && !deeperIntoSpawn(avatar.root.position.x, nz)) {
       avatar.root.position.z = nz;
       moved = true;
     }
     return moved;
+  }
+
+  function pickWander(bodies) {
+    const home = def.home || [state.baseX, state.baseZ];
+    const reach = (def.roam || 2) * 2;
+    for (let i = 0; i < 8; i++) {
+      const tx = home[0] + (Math.random() - 0.5) * reach;
+      const tz = home[1] + (Math.random() - 0.5) * reach;
+      if (Math.hypot(tx, tz) < SPAWN_CLEAR) continue;
+      if (blocked(tx, tz, radius, colliders)) continue;
+      if (overlapAmount(tx, tz, radius, bodies) > 0) continue;
+      return { x: tx, z: tz };
+    }
+    return { x: state.baseX, z: state.baseZ };
   }
 
   function stepToward(tx, tz, speed, dt, bodies) {
@@ -89,6 +121,17 @@ export function createNPC(def, anchor, colliders) {
 
   function update(dt, now, paused, bodies) {
     state.speaking = now < state.bubbleUntil;
+    const ang = ((def.name || 'A').charCodeAt(0) % 9) * 0.7 + 0.35;
+    const freed = pushOutOfBodies(
+      avatar.root.position.x,
+      avatar.root.position.z,
+      radius,
+      bodies,
+      colliders,
+      ang,
+    );
+    avatar.root.position.x = freed.x;
+    avatar.root.position.z = freed.z;
     let moving = false;
     let speed = 0;
     if (state.goal) {
@@ -98,11 +141,7 @@ export function createNPC(def, anchor, colliders) {
     } else if (def.wander && !paused) {
       const p = avatar.root.position;
       if (!state.wanderTarget || Math.hypot(state.wanderTarget.x - p.x, state.wanderTarget.z - p.z) < 0.35) {
-        const home = def.home || [state.baseX, state.baseZ];
-        state.wanderTarget = {
-          x: home[0] + (Math.random() - 0.5) * def.roam * 2,
-          z: home[1] + (Math.random() - 0.5) * def.roam * 2,
-        };
+        state.wanderTarget = pickWander(bodies);
       }
       const dx = state.wanderTarget.x - p.x;
       const dz = state.wanderTarget.z - p.z;

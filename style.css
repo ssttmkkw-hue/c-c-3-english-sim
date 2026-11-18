@@ -231,6 +231,8 @@ body.chatting #touch { display: none !important; }
   .tts-long { display: none; }
   .tts-short { display: inline; }
   #minimap { width: 90px; height: 90px; top: 8px; right: 8px; }
+  body.chatting #minimap { display: none; }
+  body.chatting #top { max-width: 100%; }
   #ambient { top: 76px; width: min(210px, 56vw); }
   #chat {
     width: 100%;

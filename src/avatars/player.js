@@ -1,5 +1,5 @@
 import { animateAvatar, createAvatar, triggerReact } from './avatar.js';
-import { blocked } from '../world/zones.js';
+import { blocked, overlapAmount } from '../world/zones.js';
 
 export function createPlayer(colliders) {
   const avatar = createAvatar({
@@ -12,15 +12,13 @@ export function createPlayer(colliders) {
   const anim = { phase: 0, react: null, reactT: 0 };
   const radius = 0.45;
 
-  function hitsBody(x, z, bodies) {
-    if (!bodies) return false;
-    for (const body of bodies) {
-      const dx = x - body.x;
-      const dz = z - body.z;
-      const min = radius + body.r;
-      if (dx * dx + dz * dz < min * min) return true;
-    }
-    return false;
+  function canStand(x, z, bodies) {
+    if (blocked(x, z, radius, colliders)) return false;
+    const before = overlapAmount(avatar.root.position.x, avatar.root.position.z, radius, bodies);
+    const after = overlapAmount(x, z, radius, bodies);
+    if (after <= 0) return true;
+    // Already overlapping: allow the step that climbs out. Never freeze in place.
+    return after < before - 1e-4;
   }
 
   function update(dt, move, run, bodies) {
@@ -36,8 +34,16 @@ export function createPlayer(colliders) {
       const pz = avatar.root.position.z;
       const nextX = px + nx * step;
       const nextZ = pz + nz * step;
-      if (!blocked(nextX, pz, radius, colliders) && !hitsBody(nextX, pz, bodies)) avatar.root.position.x = nextX;
-      if (!blocked(avatar.root.position.x, nextZ, radius, colliders) && !hitsBody(avatar.root.position.x, nextZ, bodies)) {
+      const buried = overlapAmount(px, pz, radius, bodies) > 0;
+      if (canStand(nextX, pz, bodies)) avatar.root.position.x = nextX;
+      if (canStand(avatar.root.position.x, nextZ, bodies)) avatar.root.position.z = nextZ;
+      if (
+        buried &&
+        avatar.root.position.x === px &&
+        avatar.root.position.z === pz &&
+        canStand(nextX, nextZ, bodies)
+      ) {
+        avatar.root.position.x = nextX;
         avatar.root.position.z = nextZ;
       }
       avatar.root.rotation.y = Math.atan2(nx, nz);

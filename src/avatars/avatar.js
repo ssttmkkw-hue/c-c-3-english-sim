@@ -118,6 +118,22 @@ export function lookHeadAt(avatar, x, z, dt) {
   avatar.head.rotation.y += (local - avatar.head.rotation.y) * k;
 }
 
+export function setAvatarOpacity(avatar, opacity) {
+  const next = opacity < 0.98 ? opacity : 1;
+  if (avatar.root.userData.fade === next) return;
+  avatar.root.userData.fade = next;
+  const faded = next < 1;
+  avatar.root.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      mat.opacity = next;
+      mat.transparent = faded;
+      mat.depthWrite = !faded;
+    }
+  });
+}
+
 export function triggerReact(state, kind) {
   if (kind === 'jump') {
     state.react = 'jump';

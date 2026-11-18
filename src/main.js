@@ -4,6 +4,7 @@ import { zoneAt } from './world/zones.js';
 import { ZONES } from './world/zones.js';
 import { CHARACTERS } from './data/characters.js';
 import { AMBIENT, GRAPHS, VISITOR_LINES } from './data/conversations.js';
+import { setAvatarOpacity } from './avatars/avatar.js';
 import { createPlayer } from './avatars/player.js';
 import { createNPC } from './avatars/npc.js';
 import { createKeyboard } from './input/keyboard.js';
@@ -98,6 +99,8 @@ const lookDesired = new THREE.Vector3(0, 1.2, 0);
 const lookSmoothed = new THREE.Vector3(0, 1.2, 0);
 const bubbleAnchor = new THREE.Vector3();
 const tagAnchor = new THREE.Vector3();
+const projA = new THREE.Vector3();
+const projB = new THREE.Vector3();
 let camGain = 6.2;
 let aimBias = 0;
 let eatKey = '';
@@ -565,9 +568,28 @@ function loop() {
     const alen = Math.hypot(ax, az) || 1;
     ax /= alen;
     az /= alen;
-    camDesired.set(pos.x + ax * 5.25, 2.72, pos.z + az * 5.25);
+    const narrow = window.innerWidth <= 560 || window.innerWidth < window.innerHeight;
+    const back = narrow ? 6.05 : 5.25;
+    const camY = narrow ? 4.25 : 2.72;
+    if (narrow) {
+      const sx = -az;
+      const sz = ax;
+      if (session.sideSign == null) {
+        const prefer = Math.sin(yaw) * sx + Math.cos(yaw) * sz;
+        session.sideSign = prefer < 0 ? -1 : 1;
+      }
+      const side = 2.35 * session.sideSign;
+      camDesired.set(pos.x + ax * back + sx * side, camY, pos.z + az * back + sz * side);
+    } else {
+      camDesired.set(pos.x + ax * back, camY, pos.z + az * back);
+    }
     const speak = speakerNpc ? speakerNpc.avatar.root.position : center;
-    lookDesired.set(center.x * 0.58 + speak.x * 0.42, 1.08, center.z * 0.58 + speak.z * 0.42);
+    const speakMix = narrow ? 0.74 : 0.42;
+    lookDesired.set(
+      center.x * (1 - speakMix) + speak.x * speakMix,
+      narrow ? 1.22 : 1.08,
+      center.z * (1 - speakMix) + speak.z * speakMix,
+    );
   } else if (session && session.mode === 'solo' && session.members[0]) {
     const npos = session.members[0].avatar.root.position;
     player.avatar.root.rotation.y = Math.atan2(npos.x - pos.x, npos.z - pos.z);
@@ -612,6 +634,7 @@ function loop() {
   separateCamera(camera.position);
   camera.lookAt(lookSmoothed);
   if (aimBias > 0.001) camera.rotateX(-aimBias);
+  fadePlayerIfBlocking(speakerNpc);
   updateNameTag();
   fitNameTags();
   for (const npc of npcs) fitBubble(npc);
@@ -729,8 +752,45 @@ function fitSpriteTag(tag, root, base) {
   tag.scale.set(s, s * 0.25, 1);
 }
 
+function narrowLayout() {
+  return window.innerWidth <= 560 || window.innerWidth < window.innerHeight;
+}
+
+function screenGap(ax, ay, az, bx, by, bz) {
+  projA.set(ax, ay, az).project(camera);
+  projB.set(bx, by, bz).project(camera);
+  if (projA.z < -1 || projA.z > 1 || projB.z < -1 || projB.z > 1) return 99;
+  return Math.hypot(projA.x - projB.x, projA.y - projB.y);
+}
+
+function fadePlayerIfBlocking(speakerNpc) {
+  let opacity = 1;
+  if (session && session.members.length) {
+    camera.updateMatrixWorld();
+    const cam = camera.position;
+    const p = player.avatar.root.position;
+    const playerDist = Math.hypot(p.x - cam.x, 1.3 - cam.y, p.z - cam.z);
+    const targets = speakerNpc ? [speakerNpc] : session.members;
+    for (const npc of targets) {
+      const t = npc.avatar.root.position;
+      const targetDist = Math.hypot(t.x - cam.x, 1.45 - cam.y, t.z - cam.z);
+      if (playerDist > targetDist - 0.15) continue;
+      const gap = Math.min(
+        screenGap(p.x, 1.45, p.z, t.x, 1.5, t.z),
+        screenGap(p.x, 1.05, p.z, t.x, 1.45, t.z),
+      );
+      if (gap < (narrowLayout() ? 0.62 : 0.4)) opacity = 0.28;
+    }
+  }
+  setAvatarOpacity(player.avatar, opacity);
+}
+
 function fitBubble(npc) {
   const spr = npc.avatar.bubble;
+  if (session && session.members.includes(npc)) {
+    spr.visible = false;
+    return;
+  }
   if (now >= npc.bubbleUntil()) {
     spr.visible = false;
     return;
