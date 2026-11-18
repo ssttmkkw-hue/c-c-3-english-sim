@@ -68,6 +68,8 @@ const pointer = createPointer(canvas);
 const touch = createTouch(document.body);
 const speech = createSpeechInput();
 const hud = createHUD();
+player.applyLook(hud.getAvatar());
+hud.onAvatarChange((look) => player.applyLook(look));
 const engine = new DialogueEngine(new ScriptedProvider(GRAPHS));
 const notebook = createNotebook();
 const missions = createMissions();
@@ -145,6 +147,9 @@ function buildZhIndex(graphs) {
         if (line && typeof line === 'object') put(line.text, line.zh);
       }
       for (const choice of node.choices || []) put(choice.text, choice.zh);
+      for (const phrase of node.phrases || []) {
+        if (phrase && typeof phrase === 'object') put(phrase.text, phrase.zh);
+      }
     }
   }
   return map;
@@ -560,6 +565,10 @@ window.addEventListener('keyup', (event) => {
       hud.setHelp(false);
       return;
     }
+    if (hud.tipsOpen()) {
+      hud.dismissTips();
+      return;
+    }
     if (hud.practiceOpen()) {
       hud.closePractice();
       return;
@@ -949,7 +958,7 @@ function updateNameTag() {
   for (const npc of npcs) {
     if (npc.distanceTo(p.x, p.z) < 1.7) near = true;
   }
-  tag.position.y = near ? 2.62 : 2.15;
+  tag.position.y = near ? 2.78 : 2.32;
   tag.material.opacity = near ? 0.45 : 1;
   tag.userData.base = near ? 1.05 : 1.7;
 }

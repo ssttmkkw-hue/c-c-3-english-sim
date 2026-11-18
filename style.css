@@ -66,6 +66,11 @@ html, body {
   border: 2px solid rgba(255, 255, 255, 0.35);
   pointer-events: none;
 }
+#side-stack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 #ambient {
   position: absolute;
   top: 64px;
@@ -275,7 +280,31 @@ body.chatting #touch { display: none !important; }
   #minimap { width: 90px; height: 90px; top: 8px; right: 8px; }
   body.chatting #minimap { display: none; }
   body.chatting #top { max-width: 100%; }
-  #ambient { top: 76px; width: min(210px, 56vw); }
+  #side-stack {
+    inset: auto;
+    top: 86px;
+    left: 8px;
+    width: calc(100vw - 112px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  #ambient {
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: none;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.3;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  #ambient p { margin: 0; overflow: hidden; text-overflow: ellipsis; }
   #chat {
     width: 100%;
     position: fixed;
@@ -305,16 +334,25 @@ body.chatting #touch { display: none !important; }
   #touch-actions button { min-width: 112px; }
   #stick { left: 10px; width: 108px; height: 108px; }
   #missions {
-    top: 92px;
-    left: 10px;
+    position: static;
+    left: auto;
     bottom: auto;
-    width: min(200px, 52vw);
+    top: auto;
+    width: auto;
+    max-width: 100%;
     font-size: 11px;
-    max-height: 22vh;
+    max-height: 32vh;
+    overflow: auto;
+  }
+  #missions.collapsed {
+    padding: 0;
+    background: transparent;
+    max-height: none;
+    overflow: visible;
   }
   body.chatting #missions { display: none; }
-  #ambient { top: 168px; }
-  #toast { top: 112px; max-width: 92vw; }
+  #toast { top: auto; bottom: 96px; max-width: 92vw; }
+  #tips { top: 46%; bottom: auto; }
 }
 #missions {
   position: absolute;
@@ -329,6 +367,75 @@ body.chatting #touch { display: none !important; }
   font-size: 12px;
   line-height: 1.35;
 }
+.mission-pill {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(16, 32, 39, 0.88);
+  color: #ffe082;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+}
+#avatar-panel { margin: 4px 0 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.12); }
+#avatar-panel h3 { margin: 0 0 8px; font-size: 16px; }
+.set-label { margin: 0 0 6px; font-size: 14px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+#avatar-colors .swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+#avatar-hairs .hair-opt {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #37474f;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+#avatar-colors .swatch.on, #avatar-hairs .hair-opt.on { outline: 2px solid #ffe082; }
+#avatar-name {
+  font: inherit;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+}
+#tips {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  z-index: 6;
+  pointer-events: none;
+}
+#tips-card {
+  pointer-events: auto;
+  background: #102027;
+  color: #fff;
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+}
+#tips-step { margin: 0 0 4px; color: #ffe082; font-size: 12px; letter-spacing: 0.04em; }
+#tips-text { margin: 0 0 10px; line-height: 1.4; }
+#tips-actions { display: flex; gap: 8px; justify-content: flex-end; }
+#tips-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #ffe082;
+  color: #102027;
+  font-weight: 700;
+  cursor: pointer;
+}
+#tips-skip { background: #eceff1 !important; }
 .mission-head { margin: 0 0 4px; color: #ffe082; font-weight: 700; }
 .mission { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .mission.done { color: #b9f6ca; }
@@ -393,3 +500,29 @@ body.chatting #touch { display: none !important; }
 .choice-row .choice { flex: 1; }
 #choices button.save-phrase { flex: 0 0 auto; align-self: center; }
 body.chatting #missions { bottom: auto; top: 64px; }
+@media (max-width: 520px) {
+  #missions {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: 32vh;
+    overflow: auto;
+  }
+  #missions.collapsed {
+    padding: 0;
+    background: transparent;
+    max-height: none;
+    overflow: visible;
+  }
+  body.chatting #missions { display: none; }
+  #ambient {
+    position: static;
+    width: auto;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+}

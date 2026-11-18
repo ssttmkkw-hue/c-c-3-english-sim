@@ -58,6 +58,14 @@ export function createHUD() {
   const missionsEl = document.querySelector('#missions');
   const toastEl = document.querySelector('#toast');
   const confettiEl = document.querySelector('#confetti');
+  const avatarNameEl = document.querySelector('#avatar-name');
+  const avatarColorsEl = document.querySelector('#avatar-colors');
+  const avatarHairsEl = document.querySelector('#avatar-hairs');
+  const tipsEl = document.querySelector('#tips');
+  const tipsStepEl = document.querySelector('#tips-step');
+  const tipsTextEl = document.querySelector('#tips-text');
+  const tipsNext = document.querySelector('#tips-next');
+  const tipsSkip = document.querySelector('#tips-skip');
 
   const MIC_TITLE = 'Speech recognition needs Chrome or Edge, and the page must be on localhost or https. Firefox and insecure http pages do not expose the mic API.';
 
@@ -76,9 +84,28 @@ export function createHUD() {
   let onPracticeClose = () => {};
   let onNotebookToggle = () => {};
   let onNotebookRemove = () => {};
+  let onAvatarChange = () => {};
   let savedCheck = () => false;
+  let missionsData = null;
+  let missionsOpen = false;
+  let ambientLines = [];
+  let tipIndex = 0;
   const HELP_KEY = 'plaza-english-help-v1';
+  const TIPS_KEY = 'plaza-english-tips-v1';
+  const AVATAR_KEY = 'plaza-english-avatar';
   const SETTINGS_KEY = 'plaza-english-settings';
+  const AVATAR_COLORS = [0x5c6bc0, 0xec407a, 0x26a69a, 0xef6c00, 0x8e24aa, 0x00897b, 0xf9a825, 0x6d4c41];
+  const AVATAR_HAIRS = [
+    { id: 'short', label: 'Short 短发' },
+    { id: 'bob', label: 'Bob 波波头' },
+    { id: 'spiky', label: 'Spiky 尖刺' },
+    { id: 'bun', label: 'Bun 发髻' },
+  ];
+  const TIP_STEPS = [
+    'Walk up to a group in a zone. (走到一个区域里的人群旁边。)',
+    'Press E, or tap Join, and pick a chat. (按 E 或点 Join，选一段对话。)',
+    'Reply by holding Space, or tap a choice. (按住空格说话，或点一个回答。)',
+  ];
   const LEVELS = new Set(['any', 'beginner', 'intermediate']);
 
   function sanitizeSettings(raw) {
@@ -224,16 +251,19 @@ export function createHUD() {
   retryBtn.addEventListener('click', () => onRetry());
 
   function setHelp(show) {
+    const wasOpen = !helpEl.classList.contains('hidden');
     if (show) {
       settingsEl.classList.add('hidden');
       chooserEl.classList.add('hidden');
       notebookEl.classList.add('hidden');
+      tipsEl.classList.add('hidden');
       closePractice();
     }
     helpEl.classList.toggle('hidden', !show);
     document.body.classList.toggle('help-open', !!show);
     if (!show) {
       try { localStorage.setItem(HELP_KEY, '1'); } catch (err) { /* private mode */ }
+      if (wasOpen) showTipsIfNeeded();
     }
   }
   helpBtn.addEventListener('click', () => setHelp(helpEl.classList.contains('hidden')));
@@ -243,6 +273,7 @@ export function createHUD() {
   });
   try {
     if (localStorage.getItem(HELP_KEY) !== '1') setHelp(true);
+    else showTipsIfNeeded();
   } catch (err) { /* ignore */ }
   talkAgainBtn.addEventListener('click', () => onAgain());
   leaveEndBtn.addEventListener('click', () => onLeave());
@@ -531,17 +562,30 @@ export function createHUD() {
   }
 
   function setAmbient(lines) {
+    ambientLines = lines || [];
+    paintAmbient();
+  }
+
+  function paintAmbient() {
     ambientEl.innerHTML = '';
-    if (!lines.length) {
+    if (!ambientLines.length) {
       ambientEl.classList.add('hidden');
       return;
     }
     ambientEl.classList.remove('hidden');
+    if (narrowScreen()) {
+      const line = ambientLines[ambientLines.length - 1];
+      const p = document.createElement('p');
+      p.className = 'ambient-line';
+      p.textContent = `Nearby talk · ${line.speaker}: ${line.text}`;
+      ambientEl.appendChild(p);
+      return;
+    }
     const title = document.createElement('p');
     title.className = 'ambient-title';
     title.textContent = 'Nearby talk';
     ambientEl.appendChild(title);
-    for (const line of lines) {
+    for (const line of ambientLines) {
       const p = document.createElement('p');
       p.appendChild(document.createTextNode(`${line.speaker}: ${line.text}`));
       addZh(p, line.zh);
@@ -655,13 +699,46 @@ export function createHUD() {
   }
 
   function setMissions(data) {
+    missionsData = data;
+    paintMissions();
+  }
+
+  function paintMissions() {
     missionsEl.innerHTML = '';
+    const missions = (missionsData && missionsData.missions) || [];
+    const done = missions.filter((mission) => mission.done).length;
+    const total = missions.length || 3;
+    const narrow = narrowScreen();
+    if (narrow && !missionsOpen) {
+      missionsEl.classList.add('collapsed');
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'mission-pill';
+      pill.textContent = `Today ${done}/${total}`;
+      pill.addEventListener('click', () => {
+        missionsOpen = true;
+        paintMissions();
+      });
+      missionsEl.appendChild(pill);
+      return;
+    }
+    missionsEl.classList.remove('collapsed');
+    if (narrow) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'mission-pill';
+      pill.textContent = `Today ${done}/${total}`;
+      pill.addEventListener('click', () => {
+        missionsOpen = false;
+        paintMissions();
+      });
+      missionsEl.appendChild(pill);
+    }
     const head = document.createElement('p');
     head.className = 'mission-head';
-    const streak = data && data.streak ? ` · streak ${data.streak}` : '';
+    const streak = missionsData && missionsData.streak ? ` · streak ${missionsData.streak}` : '';
     head.textContent = `Today (每日任务)${streak}`;
     missionsEl.appendChild(head);
-    const missions = (data && data.missions) || [];
     for (const mission of missions) {
       const row = document.createElement('p');
       row.className = mission.done ? 'mission done' : 'mission';
@@ -728,6 +805,110 @@ export function createHUD() {
     }
     requestAnimationFrame(frame);
   }
+
+  function sanitizeAvatar(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const color = Number(source.color);
+    const hair = AVATAR_HAIRS.some((item) => item.id === source.hair) ? source.hair : 'short';
+    const name = String(source.name || '').replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 16);
+    return {
+      name: name || 'You',
+      color: AVATAR_COLORS.includes(color) ? color : 0x5c6bc0,
+      hair,
+    };
+  }
+
+  function loadAvatar() {
+    try {
+      return sanitizeAvatar(JSON.parse(localStorage.getItem(AVATAR_KEY) || '{}'));
+    } catch (err) {
+      return sanitizeAvatar({});
+    }
+  }
+
+  let avatar = loadAvatar();
+
+  function paintAvatar() {
+    if (document.activeElement !== avatarNameEl) avatarNameEl.value = avatar.name;
+    avatarColorsEl.innerHTML = '';
+    for (const color of AVATAR_COLORS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `swatch${color === avatar.color ? ' on' : ''}`;
+      button.style.background = `#${color.toString(16).padStart(6, '0')}`;
+      button.title = `#${color.toString(16).padStart(6, '0')}`;
+      button.addEventListener('click', () => setAvatar({ color }));
+      avatarColorsEl.appendChild(button);
+    }
+    avatarHairsEl.innerHTML = '';
+    for (const hair of AVATAR_HAIRS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `hair-opt${hair.id === avatar.hair ? ' on' : ''}`;
+      button.textContent = hair.label;
+      button.addEventListener('click', () => setAvatar({ hair: hair.id }));
+      avatarHairsEl.appendChild(button);
+    }
+  }
+
+  function setAvatar(partial) {
+    avatar = sanitizeAvatar({ ...avatar, ...(partial || {}) });
+    try { localStorage.setItem(AVATAR_KEY, JSON.stringify(avatar)); } catch (err) { /* private mode */ }
+    paintAvatar();
+    onAvatarChange(getAvatar());
+    return getAvatar();
+  }
+
+  function getAvatar() {
+    return { ...avatar };
+  }
+
+  paintAvatar();
+  avatarNameEl.addEventListener('input', () => setAvatar({ name: avatarNameEl.value }));
+  avatarNameEl.addEventListener('blur', () => { avatarNameEl.value = avatar.name; });
+
+  function tipsOpen() {
+    return !tipsEl.classList.contains('hidden');
+  }
+
+  function paintTips() {
+    tipsStepEl.textContent = `Tip ${tipIndex + 1} / ${TIP_STEPS.length}`;
+    tipsTextEl.textContent = TIP_STEPS[tipIndex];
+    tipsNext.textContent = tipIndex === TIP_STEPS.length - 1 ? 'Got it (知道了)' : 'Next (下一步)';
+  }
+
+  function showTipsIfNeeded() {
+    try {
+      if (localStorage.getItem(TIPS_KEY) === '1') return;
+    } catch (err) {
+      return;
+    }
+    if (!helpEl.classList.contains('hidden')) return;
+    tipIndex = 0;
+    paintTips();
+    tipsEl.classList.remove('hidden');
+  }
+
+  function dismissTips() {
+    tipsEl.classList.add('hidden');
+    try { localStorage.setItem(TIPS_KEY, '1'); } catch (err) { /* private mode */ }
+  }
+
+  function advanceTips() {
+    if (tipIndex >= TIP_STEPS.length - 1) {
+      dismissTips();
+      return;
+    }
+    tipIndex += 1;
+    paintTips();
+  }
+
+  tipsNext.addEventListener('click', () => advanceTips());
+  tipsSkip.addEventListener('click', () => dismissTips());
+  window.addEventListener('resize', () => {
+    paintMissions();
+    paintAmbient();
+  });
 
   practicePlay.addEventListener('click', () => onPracticePlay());
   practiceClose.addEventListener('click', () => closePractice());
@@ -799,6 +980,11 @@ export function createHUD() {
     renderNotebook,
     notebookOpen,
     setMissions,
+    getAvatar,
+    setAvatar,
+    onAvatarChange(fn) { onAvatarChange = fn; },
+    tipsOpen,
+    dismissTips,
     toast,
     celebrate,
     practiceMicBtn,

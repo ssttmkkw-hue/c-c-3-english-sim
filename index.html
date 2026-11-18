@@ -31,10 +31,12 @@
       </div>
     </header>
     <canvas id="minimap" width="160" height="160" aria-label="Minimap"></canvas>
-    <aside id="missions" aria-label="Daily missions"></aside>
+    <div id="side-stack">
+      <aside id="missions" aria-label="Daily missions"></aside>
+      <div id="ambient" class="hidden"></div>
+    </div>
     <div id="toast" class="hidden" role="status"></div>
     <canvas id="confetti" class="hidden" aria-hidden="true"></canvas>
-    <div id="ambient" class="hidden"></div>
     <div id="prompt" class="hidden"></div>
     <section id="chat" class="hidden">
       <div id="chat-scroll">
@@ -96,6 +98,16 @@
           <option value="intermediate">Intermediate (中级)</option>
         </select>
       </label>
+      <div id="avatar-panel">
+        <h3>Avatar (形象)</h3>
+        <label class="set-row">Name (名字)
+          <input id="avatar-name" type="text" maxlength="16" autocomplete="off" />
+        </label>
+        <p class="set-label">Body color (衣服颜色)</p>
+        <div id="avatar-colors" class="swatches"></div>
+        <p class="set-label">Hair (发型)</p>
+        <div id="avatar-hairs" class="swatches"></div>
+      </div>
       <button type="button" id="settings-close">Close (关闭)</button>
     </div>
   </div>
@@ -126,6 +138,16 @@
       <button type="button" id="notebook-close">Close (关闭)</button>
     </div>
   </div>
+  <div id="tips" class="hidden">
+    <div id="tips-card">
+      <p id="tips-step"></p>
+      <p id="tips-text"></p>
+      <div id="tips-actions">
+        <button type="button" id="tips-skip">Skip (跳过)</button>
+        <button type="button" id="tips-next">Next (下一步)</button>
+      </div>
+    </div>
+  </div>
   <div id="help" class="hidden">
     <div id="help-card">
       <h2>Controls (操作)</h2>
@@ -143,6 +165,8 @@
         <li>At the end of a chat, press Practice on a phrase for Listen &amp; Repeat (对话结束后可以跟读练习).</li>
         <li>Press N or the book button for your phrase notebook (按 N 或笔记本按钮). Tap ☆ on a line to save it (点 ☆ 保存一句).</li>
         <li>Daily missions sit on the left (左侧是每日任务). A new local day picks three new ones.</li>
+        <li>The gear includes an Avatar panel: name, body color, and hair (齿轮里的形象可以改名字、衣服颜色和发型).</li>
+        <li>After this card, three short tips show once (关闭说明后会有三步提示，只出现一次). Skip remembers that choice.</li>
         <li>Press H or ? to open or close this list (按 H 或 ? 打开或关闭说明). Esc or Got it also closes it (Esc 或知道了也会关闭).</li>
       </ul>
       <button type="button" id="help-close">Got it (知道了)</button>
