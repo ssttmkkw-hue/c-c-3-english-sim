@@ -276,31 +276,79 @@ export function confidentEnough(confidence) {
 }
 
 /**
+ * Tokens for listen-and-repeat. Contractions are symmetrical:
+ * I'd matches I would and I had, don't matches do not, can't matches cannot and can not.
+ * A pipe token (would|had) matches either side.
+ */
+export function flexTokens(text) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const tokens = [];
+  for (const word of words) {
+    const raw = word.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z']/g, '');
+    const d = raw.match(/^([a-z]+)'d$/);
+    if (d) {
+      tokens.push(d[1]);
+      tokens.push('would|had');
+      continue;
+    }
+    if (raw === "can't") {
+      tokens.push('can');
+      tokens.push('not');
+      continue;
+    }
+    const parts = normalize(word).split(' ').filter(Boolean);
+    for (const part of parts) {
+      if (part === 'cannot') tokens.push('can', 'not');
+      else tokens.push(part);
+    }
+  }
+  return tokens;
+}
+
+function tokenMatch(heardTok, targetTok) {
+  const heardOpts = String(heardTok).split('|');
+  const targetOpts = String(targetTok).split('|');
+  let best = 0;
+  for (const heard of heardOpts) {
+    for (const target of targetOpts) {
+      if (heard === target) return 1;
+      const score = wordScore(heard, target);
+      if (score > best) best = score;
+    }
+  }
+  return best;
+}
+
+/**
  * Word-level listen-and-repeat score.
  * Each display word is green when a heard token matches (exact, synonym, or a small typo).
+ * Expanded and contracted forms score the same. "I like" does not satisfy "I'd".
  * @returns {{ score: number, stars: number, words: { text: string, ok: boolean }[] }}
  */
 export function alignPhrase(targetText, heardText) {
   const display = String(targetText || '').trim().split(/\s+/).filter(Boolean);
-  const heard = normalize(heardText).split(' ').filter(Boolean);
+  const heard = flexTokens(heardText);
   const used = new Array(heard.length).fill(false);
   const words = display.map((text) => {
-    const parts = normalize(text).split(' ').filter(Boolean);
+    const parts = flexTokens(text);
     if (!parts.length) return { text, ok: true };
     let hits = 0;
+    let cursor = 0;
     for (const part of parts) {
       let bestI = -1;
       let best = 0;
-      for (let i = 0; i < heard.length; i++) {
+      for (let i = cursor; i < heard.length; i++) {
         if (used[i]) continue;
-        const score = wordScore(heard[i], part);
+        const score = tokenMatch(heard[i], part);
         if (score > best) {
           best = score;
           bestI = i;
         }
+        if (score === 1) break;
       }
       if (best >= 0.8 && bestI >= 0) {
         used[bestI] = true;
+        cursor = bestI + 1;
         hits += 1;
       }
     }
