@@ -21,6 +21,7 @@
       <div id="top-main">
         <div id="zone-name">Plaza</div>
         <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
+        <button type="button" id="settings-btn" title="Settings">⚙</button>
         <button type="button" id="help-btn" title="Controls">?</button>
       </div>
       <div id="top-extra">
@@ -37,6 +38,7 @@
         <div id="typing" class="hidden" aria-hidden="true">…</div>
         <div id="transcript" class="hidden"></div>
         <p id="wait-hint" class="hidden">Wait for them to finish...</p>
+        <div id="hints" class="hidden"></div>
         <div id="choices"></div>
         <div id="end-box" class="hidden">
           <p>End of conversation</p>
@@ -49,6 +51,8 @@
       <form id="say-form">
         <input id="say" type="text" maxlength="160" placeholder="Type a reply, or hold Space / the mic button" autocomplete="off" />
         <button type="submit">Send</button>
+        <button type="button" id="hint-btn">Hint</button>
+        <button type="button" id="retry-btn" title="Say your line again">Retry</button>
         <button type="button" id="mic-btn" title="Hold to talk. Speech recognition needs Chrome or Edge on localhost or https.">Hold to talk</button>
         <button type="button" id="leave">Leave</button>
       </form>
@@ -61,6 +65,36 @@
       <button type="button" id="btn-talk" class="hidden">Talk</button>
     </div>
   </div>
+  <div id="chooser" class="hidden">
+    <div id="chooser-card">
+      <h2>Join a conversation (选择对话)</h2>
+      <p id="chooser-note"></p>
+      <div id="chooser-list"></div>
+      <button type="button" id="chooser-cancel">Cancel (取消)</button>
+    </div>
+  </div>
+  <div id="settings" class="hidden">
+    <div id="settings-card">
+      <h2>Settings (设置)</h2>
+      <label class="set-row"><input type="checkbox" id="set-tts" /> Read lines aloud (朗读)</label>
+      <label class="set-row">Voice (英语语音)
+        <select id="set-voice"></select>
+      </label>
+      <label class="set-row">Speed (语速) <span id="set-rate-val">1.00</span>
+        <input type="range" id="set-rate" min="0.6" max="1.4" step="0.05" value="0.96" />
+      </label>
+      <label class="set-row"><input type="checkbox" id="set-subs" /> Subtitles — 3D bubbles (字幕气泡)</label>
+      <label class="set-row"><input type="checkbox" id="set-zh" /> 中文翻译</label>
+      <label class="set-row">Difficulty (难度偏好)
+        <select id="set-level">
+          <option value="any">Any (不限)</option>
+          <option value="beginner">Beginner (初级)</option>
+          <option value="intermediate">Intermediate (中级)</option>
+        </select>
+      </label>
+      <button type="button" id="settings-close">Close (关闭)</button>
+    </div>
+  </div>
   <div id="help" class="hidden">
     <div id="help-card">
       <h2>Controls (操作)</h2>
@@ -68,9 +102,11 @@
         <li>Walk with WASD or arrow keys (WASD 或方向键移动). Hold Shift to run (按住 Shift 跑步).</li>
         <li>Drag to look around (拖动旋转镜头). Scroll to zoom (滚轮缩放).</li>
         <li>On a phone, use the joystick (手机用左下摇杆移动).</li>
-        <li>Press E or Join near a group (靠近人群按 E 或 Join 加入).</li>
+        <li>Press E or Join near a group, then pick a chat and its level (靠近人群按 E 或 Join，再选择对话和难度).</li>
         <li>Press F or Talk for a 1-on-1 chat (按 F 或 Talk 一对一聊天).</li>
         <li>Reply with a choice, the text box, or hold Space / the mic button (点选项、打字，或按住空格/麦克风说话).</li>
+        <li>Hint shows the first words. Retry lets you say the line again (Hint 显示开头几个词，Retry 再讲一次).</li>
+        <li>The gear opens settings: voice, speed, subtitles, 中文翻译, and level (齿轮打开设置).</li>
         <li>Press 1 wave, 2 nod, 3 jump (1 挥手, 2 点头, 3 跳跃).</li>
         <li>Press Esc or Leave to step away (Esc 或 Leave 离开对话).</li>
         <li>Press H or ? to open or close this list (按 H 或 ? 打开或关闭说明). Esc or Got it also closes it (Esc 或知道了也会关闭).</li>

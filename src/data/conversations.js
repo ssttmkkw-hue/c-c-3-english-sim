@@ -1,3 +1,10 @@
+import { cafeGraphs } from './zones/cafe.js';
+import { parkGraphs } from './zones/park.js';
+import { classGraphs } from './zones/classroom.js';
+import { shopGraphs } from './zones/shop.js';
+import { soloGraphs } from './zones/solos.js';
+import { applyLegacyZh } from './zh-legacy.js';
+
 /** Preset ambient loops and branching dialogues. Beginner–intermediate English. */
 
 /** Lines wandering visitors say when they stop beside a group. */
@@ -61,7 +68,7 @@ const PH = {
   solo: ['Nice to meet you.', 'Could you say that again?', 'Thank you, that helps.'],
 };
 
-export const GRAPHS = {
+const BASE_GRAPHS = {
   'cafe.join': {
     start: 'greet',
     nodes: {
@@ -82,15 +89,15 @@ export const GRAPHS = {
       milk: node('Barista Tom', [
         'Do you want oat milk or regular milk?',
       ], [
-        { text: 'Oat milk, please.', keywords: ['oat'], next: 'done', reaction: 'nod' },
-        { text: 'Regular milk is fine.', keywords: ['regular', 'dairy', 'normal'], next: 'done', reaction: 'nod' },
+        { text: 'Oat milk, please.', keywords: ['oat'], next: 'serve', reaction: 'nod' },
+        { text: 'Regular milk is fine.', keywords: ['regular', 'dairy', 'normal'], next: 'serve', reaction: 'nod' },
       ]),
       tea: node('Barista Tom', [
         { speaker: 'Barista Tom', text: 'We have green tea and black tea. Both can be iced.' },
         { speaker: 'Player: Leo_cafe', text: 'The iced black tea is my usual.' },
       ], [
-        { text: 'Iced black tea, please.', keywords: ['iced', 'black'], next: 'done', reaction: 'nod' },
-        { text: 'Hot green tea, please.', keywords: ['green', 'hot'], next: 'done', reaction: 'nod' },
+        { text: 'Iced black tea, please.', keywords: ['iced', 'black'], next: 'sweet', reaction: 'nod' },
+        { text: 'Hot green tea, please.', keywords: ['green', 'hot'], next: 'sweet', reaction: 'nod' },
       ]),
       look: node('Barista Tom', [
         'No problem. The menu is on the counter. Want a recommendation, or will you read it yourself?',
@@ -102,7 +109,7 @@ export const GRAPHS = {
         { speaker: 'Barista Tom', text: 'The oat latte is our most popular drink. It is not too sweet.' },
         { speaker: 'Player: Leo_cafe', text: 'That is what I tell everyone too.' },
       ], [
-        { text: 'I will try the oat latte.', keywords: ['oat', 'latte', 'try'], next: 'done', reaction: 'jump' },
+        { text: 'I will try the oat latte.', keywords: ['oat', 'latte', 'try'], next: 'serve', reaction: 'jump' },
         { text: 'Maybe next time. Thanks.', keywords: ['next', 'thanks', 'later'], next: 'menu2', reaction: 'nod' },
       ]),
       menu2: node('Player: Mika_88', [
@@ -110,13 +117,31 @@ export const GRAPHS = {
         { speaker: 'Player: Mika_88', text: 'We can help with the names of the drinks.' },
       ], [
         { text: 'What is a cappuccino?', keywords: ['cappuccino', 'what'], next: 'cap', reaction: 'nod' },
-        { text: 'I am all set. Thank you.', keywords: ['set', 'thank', 'ready'], next: 'done', reaction: 'wave' },
+        { text: 'I am all set. Thank you.', keywords: ['set', 'thank', 'ready'], next: 'thanks', reaction: 'wave' },
       ]),
       cap: node('Barista Tom', [
         'A cappuccino is espresso with steamed milk and foam. It is smaller than a latte.',
       ], [
         { text: 'Then I would like a cappuccino.', keywords: ['cappuccino', 'like'], next: 'done', reaction: 'nod' },
-        { text: 'Good to know. I will decide later.', keywords: ['later', 'know', 'decide'], next: 'done', reaction: 'nod' },
+        { text: 'Good to know. I will decide later.', keywords: ['later', 'know', 'decide'], next: 'thanks', reaction: 'nod' },
+      ]),
+      sweet: node('Barista Tom', [
+        'Do you want sugar in the tea?',
+      ], [
+        { text: 'No sugar, please.', keywords: ['no', 'sugar'], next: 'serve', reaction: 'nod' },
+        { text: 'A little sugar, please.', keywords: ['little', 'sugar'], next: 'serve', reaction: 'nod' },
+      ]),
+      serve: node('Barista Tom', [
+        'For here or to go?',
+      ], [
+        { text: 'For here, please.', keywords: ['here'], next: 'done', reaction: 'nod' },
+        { text: 'To go, please.', keywords: ['go', 'takeaway'], next: 'done', reaction: 'nod' },
+      ]),
+      thanks: node('Player: Mika_88', [
+        { speaker: 'Player: Mika_88', text: 'No rush. Do you want to sit with us for a minute?' },
+      ], [
+        { text: 'Yes, I will sit for a minute.', keywords: ['sit', 'yes'], next: 'done', reaction: 'nod' },
+        { text: 'I will walk around first. Thank you.', keywords: ['walk', 'thank'], next: 'done', reaction: 'wave' },
       ]),
       done: node('Barista Tom', [
         { speaker: 'Barista Tom', text: 'Great choice. I will have that ready in a minute. Enjoy the plaza!' },
@@ -144,13 +169,13 @@ export const GRAPHS = {
         'Maybe a light shower. The benches are fine if you bring a light jacket.',
       ], [
         { text: 'Then I will bring a jacket.', keywords: ['jacket', 'bring'], next: 'invite', reaction: 'nod' },
-        { text: 'I might come back tomorrow.', keywords: ['tomorrow', 'later'], next: 'bye', reaction: 'nod' },
+        { text: 'I might come back tomorrow.', keywords: ['tomorrow', 'later'], next: 'water', reaction: 'nod' },
       ]),
       invite: node('Player: JuneWalks', [
         'A walk sounds perfect. We leave from this bench around ten.',
       ], [
-        { text: 'I would like to join you.', keywords: ['join', 'like', 'come'], next: 'bye', reaction: 'jump' },
-        { text: 'Thanks, I already have plans.', keywords: ['plans', 'thanks', 'busy'], next: 'bye', reaction: 'nod' },
+        { text: 'I would like to join you.', keywords: ['join', 'like', 'come'], next: 'map', reaction: 'jump' },
+        { text: 'Thanks, I already have plans.', keywords: ['plans', 'thanks', 'busy'], next: 'map', reaction: 'nod' },
       ]),
       cozy: node('Player: Ken_outdoors', [
         'That sounds cozy. Do you read stories or something for English class?',
@@ -161,8 +186,20 @@ export const GRAPHS = {
       book: node('Player: JuneWalks', [
         'Nice. A quiet plan is still a plan. Want to meet here next weekend anyway?',
       ], [
-        { text: 'Yes, I would like that.', keywords: ['yes', 'like', 'meet'], next: 'bye', reaction: 'jump' },
-        { text: 'I will see how the week goes.', keywords: ['see', 'week', 'maybe'], next: 'bye', reaction: 'nod' },
+        { text: 'Yes, I would like that.', keywords: ['yes', 'like', 'meet'], next: 'map', reaction: 'jump' },
+        { text: 'I will see how the week goes.', keywords: ['see', 'week', 'maybe'], next: 'map', reaction: 'nod' },
+      ]),
+      water: node('Player: Ken_outdoors', [
+        'If you come tomorrow, bring water. Morning is cooler. Will you come in the morning?',
+      ], [
+        { text: 'Yes, I will come in the morning.', keywords: ['morning', 'yes'], next: 'map', reaction: 'nod' },
+        { text: 'I will come in the afternoon.', keywords: ['afternoon'], next: 'map', reaction: 'nod' },
+      ]),
+      map: node('Ranger Priya', [
+        'The fountain is near the tall trees, and the path returns to the plaza. Need anything else?',
+      ], [
+        { text: 'Where are the benches?', keywords: ['bench', 'where', 'sit'], next: 'bye', reaction: 'nod' },
+        { text: 'I am all set. Thank you.', keywords: ['set', 'thank', 'all'], next: 'bye', reaction: 'wave' },
       ]),
       bye: node('Ranger Priya', [
         'Have a good one. Enjoy the fresh air, and wave if you need the path map.',
@@ -200,13 +237,19 @@ export const GRAPHS = {
         { speaker: 'Player: Hana_studies', text: 'Welcome to class. Want to try one more sentence?' },
       ], [
         { text: 'Yes. I have studied English for one year.', keywords: ['studied', 'for', 'year'], next: 'more', reaction: 'jump' },
-        { text: 'Thank you. I will practice tonight.', keywords: ['thank', 'practice', 'tonight'], next: 'close', reaction: 'nod' },
+        { text: 'Thank you. I will practice tonight.', keywords: ['thank', 'practice', 'tonight'], next: 'practice', reaction: 'nod' },
       ]),
       more: node('Teacher Lin', [
         'Excellent. That sentence uses for plus a length of time. You can also say since last year.',
       ], [
         { text: 'I have studied English since last year.', keywords: ['since', 'year'], next: 'close', reaction: 'nod' },
-        { text: 'I will write both sentences down.', keywords: ['write', 'both'], next: 'close', reaction: 'nod' },
+        { text: 'I will write both sentences down.', keywords: ['write', 'both'], next: 'practice', reaction: 'nod' },
+      ]),
+      practice: node('Teacher Lin', [
+        'Before you go, say one sentence about your day.',
+      ], [
+        { text: 'I am practicing English today.', keywords: ['practic', 'today', 'english'], next: 'close', reaction: 'nod' },
+        { text: 'I met new people in class.', keywords: ['met', 'people', 'class'], next: 'close', reaction: 'jump' },
       ]),
       close: node('Student Noah', [
         { speaker: 'Teacher Lin', text: 'Lovely work. Come back any time you want more practice.' },
@@ -546,3 +589,14 @@ export const GRAPHS = {
     },
   },
 };
+
+export const GRAPHS = {
+  ...BASE_GRAPHS,
+  ...cafeGraphs,
+  ...parkGraphs,
+  ...classGraphs,
+  ...shopGraphs,
+  ...soloGraphs,
+};
+
+applyLegacyZh(GRAPHS, AMBIENT, VISITOR_LINES);

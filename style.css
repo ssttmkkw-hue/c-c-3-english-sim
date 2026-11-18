@@ -35,13 +35,13 @@ html, body {
   align-items: center;
   flex-wrap: wrap;
 }
-#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn {
+#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn, #settings-btn {
   background: rgba(16, 32, 39, 0.78);
   color: #fff;
   border-radius: 12px;
 }
 #stats { padding: 8px 12px; font-size: 13px; }
-#help-btn {
+#help-btn, #settings-btn {
   border: 0;
   width: 36px;
   height: 36px;
@@ -106,6 +106,10 @@ html, body {
 #chat-log .heard { color: #b2dfdb; font-style: italic; }
 #chat-log .recap { background: rgba(255, 224, 130, 0.16); border-radius: 8px; padding: 8px; }
 #chat-log .recap strong { color: #ffe082; }
+.zh { display: none; color: #ffe082; font-weight: 500; font-size: 13px; }
+body.show-zh .zh { display: block; margin-top: 2px; }
+#hints { margin: 6px 0; color: #b2dfdb; font-size: 14px; }
+#hints p { margin: 0 0 4px; }
 #typing {
   color: #b3e5fc;
   letter-spacing: 0.2em;
@@ -116,7 +120,7 @@ html, body {
 #end-box { margin: 8px 0; }
 #end-box p { margin: 0 0 8px; font-weight: 700; }
 #end-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-#help {
+#chooser, #settings, #help {
   position: fixed;
   inset: 0;
   background: rgba(16, 32, 39, 0.45);
@@ -127,7 +131,7 @@ html, body {
   z-index: 5;
   padding: 16px;
 }
-#help-card {
+#help-card, #chooser-card, #settings-card {
   width: min(520px, 100%);
   background: #102027;
   color: #fff;
@@ -136,7 +140,32 @@ html, body {
   max-height: min(80vh, 640px);
   overflow: auto;
 }
-#help-card h2 { margin: 0 0 10px; font-size: 20px; }
+#help-card h2, #chooser-card h2, #settings-card h2 { margin: 0 0 10px; font-size: 20px; }
+#chooser-note { margin: 0 0 10px; color: #ffe082; min-height: 0; }
+#chooser-note:empty { display: none; }
+#chooser-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+#chooser-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border-radius: 12px;
+  background: #eceff1;
+}
+.level { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: #455a64; }
+.level.intermediate { color: #e65100; }
+.set-row { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; font-size: 15px; }
+.set-row:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
+.set-row input[type="checkbox"] { margin-right: 8px; }
+#set-voice, #set-level {
+  font: inherit;
+  border-radius: 8px;
+  border: 0;
+  padding: 8px;
+}
+#set-rate { width: 100%; }
+#settings-close, #chooser-cancel { margin-top: 4px; }
 #help-card ul { margin: 0 0 12px; padding-left: 18px; }
 #help-card li { margin: 0 0 8px; line-height: 1.4; }
 #help-close {
@@ -155,7 +184,13 @@ html, body {
   min-height: 1.2em;
 }
 #choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-#choices button, #say-form button, #touch-actions button {
+#choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+#choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;
@@ -222,7 +257,7 @@ body.chatting #touch { display: none !important; }
   #top-main, #top-extra { flex-wrap: nowrap; gap: 6px; max-width: 100%; }
   #zone-name { padding: 6px 8px; font-size: 13px; }
   #mic-state { padding: 6px 8px; font-size: 12px; }
-  #help-btn { width: 32px; height: 32px; }
+  #help-btn, #settings-btn { width: 32px; height: 32px; }
   #stats, #tts-label {
     padding: 3px 8px;
     font-size: 11px;

@@ -16,6 +16,11 @@ export const CHARACTERS = [
   { id: 'mei', name: 'Player: Mei_shop', kind: 'player', color: 0xd81b60, accent: 0xffe0bd, zone: 'shop', group: 'shop', solo: null, angle: 3.1, voice: 4 },
   { id: 'omar', name: 'Player: Omar_22', kind: 'player', color: 0x3949ab, accent: 0xf0c8a0, zone: 'shop', group: 'shop', solo: 'omar.solo', angle: 5.0, voice: 5 },
 
+  { id: 'nina', name: 'Tourist Nina', kind: 'npc', color: 0xf9a825, accent: 0xffe0bd, zone: 'plaza', group: null, solo: 'nina.solo', home: [1.2, 5.4], angle: 0.4, voice: 1 },
+  { id: 'ada', name: 'Librarian Ada', kind: 'npc', color: 0x6a1b9a, accent: 0xffe0bd, zone: 'classroom', group: null, solo: 'ada.solo', home: [-20.2, 6.4], angle: 0.9, voice: 4 },
+  { id: 'jo', name: 'Musician Jo', kind: 'npc', color: 0xc62828, accent: 0xffe0bd, zone: 'park', group: null, solo: 'jo.solo', home: [9.2, -19.4], angle: 1.1, voice: 2 },
+  { id: 'bea', name: 'Customer Bea', kind: 'player', color: 0x00897b, accent: 0xffccbc, zone: 'shop', group: null, solo: 'bea.solo', home: [18.4, 9.2], angle: 2.2, voice: 5 },
+
   { id: 'rae', name: 'Player: Rae_guides', kind: 'player', color: 0x00838f, accent: 0xffe0bd, zone: 'plaza', group: null, solo: 'rae.solo', wander: true, home: [0, 0], roam: 6, voice: 2 },
   { id: 'eli', name: 'Student Eli', kind: 'npc', color: 0x8e24aa, accent: 0xffe0bd, zone: 'classroom', group: null, solo: 'eli.solo', wander: true, home: [-18, 6], roam: 3.2, voice: 3 },
 ];

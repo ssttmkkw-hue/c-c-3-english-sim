@@ -4,6 +4,7 @@ import { zoneAt } from './world/zones.js';
 import { ZONES } from './world/zones.js';
 import { CHARACTERS } from './data/characters.js';
 import { AMBIENT, GRAPHS, VISITOR_LINES } from './data/conversations.js';
+import { GROUP_CONVERSATIONS } from './data/catalog.js';
 import { setAvatarOpacity } from './avatars/avatar.js';
 import { createPlayer } from './avatars/player.js';
 import { createNPC } from './avatars/npc.js';
@@ -153,10 +154,11 @@ async function playTurn(turn, token, source) {
       npc.say(line.text, now);
       npc.react(turn.reaction || 'nod');
     }
-    hud.addLog(line.speaker, line.text, 'npc');
+    hud.addLog(line.speaker, line.text, 'npc', line.zh || '');
     lastNpcLine = `${line.speaker}: ${line.text}`;
     session.speaker = line.speaker;
-    if (hud.ttsEnabled()) speakLine(line.text, voiceOf(line.speaker));
+    if (hud.ttsEnabled()) speakLine(line.text, voiceOf(line.speaker), voiceOptions());
+    session.lastSpoken = line.text;
     await wait(Math.min(2800, 900 + line.text.length * 22));
   }
   if (token !== playToken || !session) return;
@@ -169,6 +171,7 @@ async function playTurn(turn, token, source) {
   }
   hud.setTyping(false);
   session.busy = false;
+  session.confirming = !!turn.confirm;
   if (turn.ended) {
     choiceList = [];
     hud.setChoices([]);
@@ -185,6 +188,7 @@ async function playTurn(turn, token, source) {
   }
   choiceList = (turn.choices || []).map((choice) => ({
     text: choice.text,
+    zh: choice.zh || '',
     keywords: choice.keywords || [],
   }));
   hud.setChoices(choiceList);
@@ -221,6 +225,8 @@ async function openConversation(conversationId, mode, members) {
     members,
     busy: true,
     ended: false,
+    confirming: false,
+    lastSpoken: '',
     context: {
       conversationId,
       zoneId: zone.id,
@@ -278,7 +284,19 @@ function talkAgain() {
   openConversation(conversationId, mode, members);
 }
 
-function submitText(text, source) {
+function voiceOptions() {
+  const settings = hud.getSettings();
+  return { rate: settings.rate, voiceURI: settings.voiceURI };
+}
+
+function firstWords(text) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const count = Math.min(3, words.length);
+  const cut = words.slice(0, count).join(' ');
+  return words.length > count ? `${cut}…` : cut;
+}
+
+function submitText(text, source, zh) {
   const clean = String(text || '').trim();
   if (!session || !clean || session.ended) return;
   if (session.busy) {
@@ -293,16 +311,33 @@ function submitText(text, source) {
   hud.showEnd(false);
   session.busy = true;
   hud.setTyping(true);
-  hud.addLog('You', clean, 'you');
+  hud.addLog('You', clean, 'you', zh || '');
   const turn = engine.respond(clean, session.context);
   if (turn && typeof turn.then === 'function') turn.then((value) => applyTurn(value, token, source || 'text'));
   else applyTurn(turn, token, source || 'text');
 }
 
-hud.onChoice((text) => { submitText(text, 'choice'); });
+hud.onChoice((text, zh) => { submitText(text, 'choice', zh); });
 hud.onSend((text) => { submitText(text, 'text'); });
 hud.onLeave(() => closeConversation());
 hud.onAgain(() => talkAgain());
+hud.onHint(() => {
+  if (!session || session.ended) return;
+  const choices = engine.currentChoices();
+  hud.showHints(choices.map((choice) => firstWords(choice.text)));
+});
+hud.onRetry(() => {
+  if (!session || session.ended) return;
+  if (session.confirming) {
+    submitText('Try again', 'retry');
+    return;
+  }
+  hud.setTranscript('');
+  if (document.activeElement !== hud.sayEl) hud.sayEl.focus();
+  if (hud.ttsEnabled() && session.lastSpoken) {
+    speakLine(session.lastSpoken, voiceOf(session.speaker), voiceOptions());
+  }
+});
 
 function holdMic() {
   if (!session || !speech.supported || micHeld) return;
@@ -332,9 +367,11 @@ function keyName(event) {
 window.addEventListener('keydown', (event) => {
   if (event.repeat) return;
   const name = keyName(event);
-  if (hud.helpOpen()) {
-    if (name === 'esc' || (name === 'help' && !keyboard.typing())) {
-      hud.setHelp(false);
+  if (hud.uiLocked()) {
+    if (name === 'esc' || (name === 'help' && hud.helpOpen() && !keyboard.typing())) {
+      if (hud.helpOpen()) hud.setHelp(false);
+      else if (hud.settingsOpen()) hud.setSettingsOpen(false);
+      else hud.setChooser(false);
       eatKey = name;
       event.preventDefault();
     } else if (name === 'help') {
@@ -361,6 +398,14 @@ window.addEventListener('keyup', (event) => {
   if (name === 'esc') {
     if (hud.helpOpen()) {
       hud.setHelp(false);
+      return;
+    }
+    if (hud.settingsOpen()) {
+      hud.setSettingsOpen(false);
+      return;
+    }
+    if (hud.chooserOpen()) {
+      hud.setChooser(false);
       return;
     }
     closeConversation();
@@ -410,7 +455,7 @@ function updateAmbient(dt, x, z) {
     if (group.recent.length > 3) group.recent.shift();
     if (hud.ttsEnabled() && !session) {
       const near = Math.hypot(group.zone.anchor[0] - x, group.zone.anchor[1] - z) < 7;
-      if (near) speakLine(line.text, voiceOf(line.speaker));
+      if (near) speakLine(line.text, voiceOf(line.speaker), voiceOptions());
     }
   }
 }
@@ -464,14 +509,15 @@ function updateVisitors(dt) {
       const nearGroup = npc.distanceTo(ax, az) < 4.1;
       if (npc.goalDistance() < 0.45 || (visit.timer <= 0 && nearGroup)) {
         const lines = VISITOR_LINES[npc.def.id] || VISITOR_LINES.rae;
-        const text = lines[Math.floor(Math.random() * lines.length)];
+        const raw = lines[Math.floor(Math.random() * lines.length)];
+        const text = typeof raw === 'string' ? raw : raw.text;
         const spot = npc.avatar.root.position;
         npc.setGoal(spot.x, spot.z, ax, az);
         npc.say(text, now);
         npc.react('wave');
         npc.face(ax, az);
         visit.group.focus = { name: npc.def.name, x: spot.x, z: spot.z, until: now + 4.3 };
-        visit.group.recent.push({ speaker: npc.def.name, text });
+        visit.group.recent.push({ speaker: npc.def.name, text, zh: (raw && raw.zh) || '' });
         if (visit.group.recent.length > 3) visit.group.recent.shift();
         visit.phase = 'talk';
         visit.timer = 3.3 + Math.random() * 1.4;
@@ -496,7 +542,7 @@ function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
   now += dt;
-  const help = hud.helpOpen();
+  const help = hud.uiLocked();
   const look = pointer.read();
   if (!help) {
     yaw -= look.dx * 0.005;
@@ -653,19 +699,19 @@ function loop() {
       }
     }
     const lines = [];
-    if (group) lines.push('Press E to join conversation');
+    if (group) lines.push('Press E to choose a conversation');
     if (solo) lines.push(`Press F to chat 1-on-1 with ${solo.def.name}`);
     hud.setPrompt(lines);
     hud.setActions({
-      join: group ? 'Join conversation' : null,
+      join: group ? 'Choose conversation' : null,
       talk: solo ? 'Talk 1-on-1' : null,
     });
     if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
       hud.setAmbient(group.recent.slice(-2));
     } else hud.setAmbient([]);
-    if (!help && group && keyboard.consume('KeyE')) openConversation(group.zone.dialogue, 'group', group.members);
+    if (!help && group && keyboard.consume('KeyE')) openChooser(group);
     if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
-    hud.joinBtn.onclick = () => { if (group) openConversation(group.zone.dialogue, 'group', group.members); };
+    hud.joinBtn.onclick = () => { if (group) openChooser(group); };
     hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
   }
 
@@ -788,6 +834,10 @@ function fadePlayerIfBlocking(speakerNpc) {
 
 function fitBubble(npc) {
   const spr = npc.avatar.bubble;
+  if (!hud.getSettings().subtitles) {
+    spr.visible = false;
+    return;
+  }
   if (session && session.members.includes(npc)) {
     spr.visible = false;
     return;
@@ -855,11 +905,64 @@ function nearestSolo() {
   return solo;
 }
 
+function orderedTalks(zoneId) {
+  const list = GROUP_CONVERSATIONS.filter((item) => item.zone === zoneId);
+  const pref = hud.getSettings().difficulty;
+  if (pref === 'any') return list.map((item) => ({ ...item }));
+  const preferred = list.filter((item) => item.level === pref);
+  const rest = list.filter((item) => item.level !== pref);
+  return [...preferred, ...rest].map((item) => ({ ...item, preferred: item.level === pref }));
+}
+
+function openChooser(group) {
+  if (!group || session) return;
+  const items = orderedTalks(group.zone.id);
+  const pref = hud.getSettings().difficulty;
+  const note = pref === 'any' ? '' : `Your setting lists ${pref} chats first.`;
+  hud.showChooser(items, note);
+}
+
+hud.onPick((id) => { joinConversation(id, true); });
+
 function tryJoin() {
   if (session) return;
   const pos = player.avatar.root.position;
   const group = nearestGroup(pos.x, pos.z);
-  if (group) openConversation(group.zone.dialogue, 'group', group.members);
+  if (group) openChooser(group);
+}
+
+function listConversations(zone) {
+  const key = String(zone || '').trim().toLowerCase();
+  const alias = { class: 'classroom', classroom: 'classroom' }[key] || key;
+  const list = GROUP_CONVERSATIONS.filter((item) => !key || item.zone === alias);
+  return list.map(({ id, title, level, zone: zoneId }) => ({ id, title, level, zone: zoneId }));
+}
+
+function joinConversation(id, nearbyOnly) {
+  const key = String(id || '').trim();
+  const meta = GROUP_CONVERSATIONS.find((item) => item.id === key);
+  if (meta) {
+    const groupId = Object.keys(GROUP_ZONE).find((name) => GROUP_ZONE[name] === meta.zone);
+    const group = groups[groupId];
+    if (!group) return false;
+    if (nearbyOnly) {
+      const pos = player.avatar.root.position;
+      const near = nearestGroup(pos.x, pos.z);
+      if (!near || near.id !== group.id) return false;
+    } else {
+      teleportTo(meta.zone);
+    }
+    if (session) closeConversation();
+    openConversation(meta.id, 'group', group.members);
+    return true;
+  }
+  const npc = npcs.find((item) => item.def.solo === key || item.def.id === key);
+  if (!npc || !npc.def.solo) return false;
+  if (session) closeConversation();
+  const spot = npc.avatar.root.position;
+  player.avatar.root.position.set(spot.x + 1.25, 0, spot.z + 0.15);
+  openConversation(npc.def.solo, 'solo', [npc]);
+  return true;
 }
 
 function tryChat() {
@@ -905,15 +1008,22 @@ window.__sim = {
       conversationId: session ? session.conversationId : null,
       lastNpcLine,
       choices: choiceList.map((choice) => choice.text),
+      confirming: !!(session && session.confirming),
+      chooserOpen: hud.chooserOpen(),
+      settings: hud.getSettings(),
     };
   },
   teleportTo,
   join: tryJoin,
   chat: tryChat,
+  listConversations,
+  joinConversation: (id) => joinConversation(id, false),
+  getSettings: () => hud.getSettings(),
+  setSettings: (partial) => hud.setSettings(partial),
   say(text) { submitText(String(text || ''), 'text'); },
   choose(index) {
     const choice = choiceList[index];
-    if (choice) submitText(choice.text, 'choice');
+    if (choice) submitText(choice.text, 'choice', choice.zh || '');
   },
   leave: closeConversation,
   chatWith(name) {

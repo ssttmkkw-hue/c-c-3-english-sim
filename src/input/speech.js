@@ -107,14 +107,22 @@ export function createSpeechInput() {
 
 const PITCH = [0.85, 1.05, 1.15, 0.95, 1.2, 0.9];
 
-export function speakLine(text, voiceIndex) {
+export function englishVoices() {
+  if (!window.speechSynthesis || typeof window.speechSynthesis.getVoices !== 'function') return [];
+  return window.speechSynthesis.getVoices().filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith('en'));
+}
+
+export function speakLine(text, voiceIndex, options = {}) {
   if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') return;
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'en-US';
   utter.pitch = PITCH[(voiceIndex || 0) % PITCH.length];
-  utter.rate = 0.96;
-  const voices = window.speechSynthesis.getVoices().filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith('en'));
-  if (voices.length) utter.voice = voices[(voiceIndex || 0) % voices.length];
+  const rate = Number(options.rate);
+  utter.rate = Number.isFinite(rate) ? Math.min(1.4, Math.max(0.6, rate)) : 0.96;
+  const voices = englishVoices();
+  const picked = options.voiceURI && voices.find((voice) => voice.voiceURI === options.voiceURI);
+  if (picked) utter.voice = picked;
+  else if (voices.length) utter.voice = voices[(voiceIndex || 0) % voices.length];
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utter);
 }
