@@ -1,4 +1,4 @@
-import { estimateLineDuration } from '../dialogue/SceneDirector.js';
+import { speakingBudget } from '../dialogue/timing.js';
 
 /**
  * Push-to-talk wrapper around webkitSpeechRecognition / SpeechRecognition.
@@ -136,8 +136,8 @@ function voicesReady() {
   }
 }
 
-function utteranceCapMs(text) {
-  return Math.round(estimateLineDuration(text) * 1.5 * 1000);
+function utteranceCapMs(text, rate) {
+  return Math.round(speakingBudget(text, { listening: true, rate }).hard * 1000);
 }
 
 function dropJob(job) {
@@ -197,7 +197,7 @@ function startJob(job) {
   if (picked) utter.voice = picked;
   else if (voices.length) utter.voice = voices[(job.voiceIndex || 0) % voices.length];
   lane.active = job;
-  job.timer = setTimeout(() => finishJob(job, true), utteranceCapMs(job.text));
+  job.timer = setTimeout(() => finishJob(job, true), utteranceCapMs(job.text, job.options.rate));
   utter.onend = () => finishJob(job, false);
   utter.onerror = () => finishJob(job, false);
   try {

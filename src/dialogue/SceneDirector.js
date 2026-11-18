@@ -4,34 +4,16 @@
  * Backchannels are the only overlap. Main bubbles fade; they do not stack.
  */
 
+import { drawGap, speakingBudget } from './timing.js';
+
 const LEAD_IN = 0.2;
 const TAIL = 0.12;
 const BACK_COOLDOWN = 8;
 const BACK_EARLIEST = 0.8;
-
-export function estimateLineDuration(text) {
-  const words = String(text || '').trim().split(/\s+/).filter(Boolean).length;
-  // Readable, and a full classroom chat still ends before a short wait.
-  return Math.max(1.4, words / 4.6 + 0.08);
-}
+const STALL_MS = 20000;
 
 function nowMs() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-}
-
-function wordCount(text) {
-  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
-}
-
-function isQuestion(text) {
-  return /\?\s*$/.test(String(text || '').trim());
-}
-
-function isQuick(line) {
-  if (!line) return false;
-  if (line.quick) return true;
-  const words = wordCount(line.text);
-  return words > 0 && words <= 4 && !isQuestion(line.text);
 }
 
 export function createSceneDirector(options) {
@@ -42,6 +24,7 @@ export function createSceneDirector(options) {
   const playerPos = options.playerPos || (() => null);
   const onLine = options.onLine || (() => {});
   const onSpeak = options.onSpeak || (() => null);
+  const getTiming = options.getTiming || (() => ({ rate: 0.96 }));
   const random = options.random || Math.random;
   const ambientEnabled = options.ambient !== false;
   const patienceText = (options.patienceLine && options.patienceLine.text) || 'Take your time.';
@@ -100,17 +83,18 @@ export function createSceneDirector(options) {
     return staff ? staff.def.name : '';
   }
 
-  function drawGap(line, next) {
-    if (line && Array.isArray(line.gapAfter) && line.gapAfter.length >= 2) {
-      const a = Number(line.gapAfter[0]);
-      const b = Number(line.gapAfter[1]);
-      const lo = Number.isFinite(a) ? a : 0.5;
-      const hi = Number.isFinite(b) ? b : lo;
-      return lo + random() * Math.max(0, hi - lo);
+  function gapAfter(line, next) {
+    return drawGap(line, next, random);
+  }
+
+  function speechRate() {
+    try {
+      const timing = getTiming() || {};
+      const rate = Number(timing.rate);
+      return Number.isFinite(rate) ? rate : 0.96;
+    } catch (err) {
+      return 0.96;
     }
-    if (isQuick(next)) return 0.2 + random() * 0.2;
-    if (line && isQuestion(line.text)) return 1.5 + random() * 1.0;
-    return 0.5 + random() * 1.0;
   }
 
   let waitSpan = 0;
@@ -315,8 +299,10 @@ export function createSceneDirector(options) {
         }
       }
     } catch (err) { /* a nod must not freeze the line */ }
-    const joinCut = (pendingWelcome || mode === 'join') && elapsed >= Math.min(minDur, 1.05);
-    if (joinCut || elapsed >= watchdog || (elapsed >= minDur && ttsDone)) enterTail(now);
+    // A live utterance holds the floor until onend. The watchdog is only for a
+    // voice that never finishes. Joining waits for that end; it does not cut in.
+    const natural = ttsDone && elapsed >= minDur;
+    if (natural || elapsed >= watchdog) enterTail(now);
   }
 
   function serviceHeld(now) {
@@ -359,8 +345,9 @@ export function createSceneDirector(options) {
 
   function beginSpeaking(now) {
     const text = currentLine.text;
-    minDur = estimateLineDuration(text);
-    watchdog = minDur * 1.5;
+    const read = speakingBudget(text, { listening: false, rate: speechRate() });
+    minDur = read.minDur;
+    watchdog = read.hard;
     lineStart = now;
     lineMark = nowMs();
     state = 'speaking';
@@ -369,13 +356,16 @@ export function createSceneDirector(options) {
       if (npc !== speakerNpc && npc.isMainBubble()) npc.fadeBubble(0.4);
     }
     trackMain(speakerNpc);
-    speakerNpc.say(text, now, watchdog + 8, 'main');
+    speakerNpc.say(text, now, 60, 'main');
     sampleOverlap();
     ttsDone = true;
     let pending = null;
     try { pending = onSpeak(currentLine, currentKind); } catch (err) { pending = null; }
     if (pending && typeof pending.then === 'function') {
       ttsDone = false;
+      const heard = speakingBudget(text, { listening: true, rate: speechRate() });
+      minDur = Math.max(minDur, heard.minDur);
+      watchdog = Math.max(watchdog, heard.hard);
       const token = ++speakToken;
       const markHeard = () => {
         if (token === speakToken) ttsDone = true;
@@ -493,7 +483,7 @@ export function createSceneDirector(options) {
       resolve(true);
     }
     if (mode === 'dialogue' && dialogueQueue.length) {
-      arm(now, drawGap(finishedLine, dialogueQueue[0]));
+      arm(now, gapAfter(finishedLine, dialogueQueue[0]));
       return;
     }
     if (mode === 'dialogue' && finishedKind === 'dialogue') {
@@ -514,7 +504,7 @@ export function createSceneDirector(options) {
       arm(now, 9999);
       return;
     }
-    let gap = drawGap(finishedLine, insertQueue.length ? insertQueue[0].line : peekAmbient());
+    let gap = gapAfter(finishedLine, insertQueue.length ? insertQueue[0].line : peekAmbient());
     if (finishedKind === 'ambient' && endOfScene()) gap = Math.max(gap, 1.15 + random() * 0.65);
     arm(now, gap);
   }
@@ -615,6 +605,10 @@ export function createSceneDirector(options) {
     sampleOverlap();
   }
 
+  function floorBusy() {
+    return state === 'speaking' || state === 'leadIn' || state === 'tail';
+  }
+
   function requestJoin(text, zh) {
     return new Promise((resolve) => {
       let settled = false;
@@ -644,16 +638,30 @@ export function createSceneDirector(options) {
         return;
       }
       pendingWelcome = { resolve: finish, line };
-      const running = state === 'speaking' || state === 'leadIn' || state === 'tail';
-      const extra = running && currentLine ? estimateLineDuration(currentLine.text) * 1.5 : 0;
-      const cap = (extra + estimateLineDuration(line.text) * 1.5 + 1.4) * 1000;
-      joinTimer = setTimeout(() => {
+      // Safety net only. A healthy line (and its welcome) resolves from onTail.
+      // The timer must not open the dialogue while someone is still mid-line.
+      let mark = '';
+      let movedAt = nowMs();
+      const step = () => {
+        if (settled) return;
+        const nextMark = `${state}|${lineId}|${speakToken}|${pendingWelcome ? 1 : 0}|${welcomeResolve ? 1 : 0}`;
+        if (nextMark !== mark) {
+          mark = nextMark;
+          movedAt = nowMs();
+        }
+        const waiting = floorBusy() || pendingWelcome || welcomeResolve;
+        if (waiting && nowMs() - movedAt < STALL_MS) {
+          joinTimer = setTimeout(step, 300);
+          return;
+        }
         if (pendingWelcome && pendingWelcome.resolve === finish) pendingWelcome = null;
         if (welcomeResolve === finish) welcomeResolve = null;
         if (mode === 'join') mode = 'dialogue';
+        if (floorBusy()) enterTail(lastNow);
         hurry = true;
         finish();
-      }, Math.max(2200, cap));
+      };
+      joinTimer = setTimeout(step, 300);
       if (state === 'gap' || state === 'held') hurry = true;
     });
   }
@@ -713,17 +721,28 @@ export function createSceneDirector(options) {
   function armPlayTimer() {
     clearTimeout(playTimer);
     playTimer = 0;
-    if (!dialogueResolve || !dialogueQueue.length) return;
-    const budget = dialogueQueue.reduce((sum, line) => {
-      return sum + estimateLineDuration(line.text) * 1.5 + 2.6;
-    }, 1.2);
-    playTimer = setTimeout(() => {
+    if (!dialogueResolve) return;
+    let mark = '';
+    let movedAt = nowMs();
+    const step = () => {
       if (!dialogueResolve) return;
+      const nextMark = `${state}|${lineId}|${speakToken}|${dialogueQueue.length}`;
+      if (nextMark !== mark) {
+        mark = nextMark;
+        movedAt = nowMs();
+      }
+      const busy = floorBusy() || dialogueQueue.length > 0;
+      if (busy && nowMs() - movedAt < STALL_MS) {
+        playTimer = setTimeout(step, 400);
+        return;
+      }
+      if (!busy) return;
       dialogueQueue = [];
       try { if (speakerNpc) speakerNpc.fadeBubble(0.3); } catch (err) { /* bubble already gone */ }
       enterHeld(lastNow, true);
       releaseDialogue();
-    }, Math.max(2000, budget * 1000));
+    };
+    playTimer = setTimeout(step, 400);
   }
 
   function holdForPlayer() {
@@ -795,6 +814,51 @@ export function createSceneDirector(options) {
     finishFarewell(lastNow);
   }
 
+  function cancelPlayback() {
+    dialogueQueue = [];
+    clearTimeout(playTimer);
+    playTimer = 0;
+    if (currentKind === 'dialogue' && speakerNpc && speakerNpc.fadeBubble) {
+      try { speakerNpc.fadeBubble(0.2); } catch (err) { /* bubble already gone */ }
+    }
+    if (currentKind === 'dialogue' || currentKind === 'nudge') {
+      speakToken += 1;
+      ttsDone = true;
+      currentKind = '';
+      currentLine = null;
+      speaker = null;
+      lineId = null;
+      speakerNpc = null;
+      state = 'held';
+      patience = false;
+    }
+    releaseDialogue();
+  }
+
+  function releaseFloor() {
+    dialogueQueue = [];
+    clearTimeout(playTimer);
+    playTimer = 0;
+    clearTimeout(joinTimer);
+    joinTimer = 0;
+    patience = false;
+    pendingWelcome = null;
+    farewellLine = null;
+    if (welcomeResolve) {
+      const resolve = welcomeResolve;
+      welcomeResolve = null;
+      resolve();
+    }
+    releaseDialogue();
+    settleSuspend();
+    if (speakerNpc && speakerNpc.fadeBubble) {
+      try { speakerNpc.fadeBubble(0.2); } catch (err) { /* bubble already gone */ }
+    }
+    speakToken += 1;
+    ttsDone = true;
+    finishFarewell(lastNow);
+  }
+
   function cancelVisitor(name) {
     insertQueue = insertQueue.filter((item) => {
       if (item.line.speaker !== name) return true;
@@ -835,6 +899,8 @@ export function createSceneDirector(options) {
     cancelVisitor,
     suspend,
     resume,
+    cancelPlayback,
+    releaseFloor,
     acceptsVisitors() {
       return mode === 'ambient' && !pendingWelcome && !farewellLine;
     },
