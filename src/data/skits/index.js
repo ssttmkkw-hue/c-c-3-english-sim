@@ -29,3 +29,17 @@ export function groupIdForSkit(skit) {
 export function spotForSkit(id) {
   return SKIT_SPOTS.find((spot) => spot.id === id) || null;
 }
+
+/** Every role's npc name must already be a person in the world. */
+export function missingCast(names) {
+  const have = names instanceof Set ? names : new Set(names || []);
+  const missing = [];
+  for (const skit of SKITS) {
+    for (const member of skit.cast || []) {
+      if (!member.npc || !have.has(member.npc)) {
+        missing.push({ skit: skit.id, role: member.role, npc: member.npc || '' });
+      }
+    }
+  }
+  return missing;
+}

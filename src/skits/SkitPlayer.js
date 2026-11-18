@@ -11,6 +11,9 @@ function delay(ms) {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
+const COVER_MS = 10000;
+const COVER_SKIP_MS = 8000;
+
 function wordsOf(text) {
   return String(text || '').trim().split(/\s+/).filter(Boolean);
 }
@@ -25,16 +28,6 @@ function hits(text, keywords) {
     if (key.includes(' ')) return said.includes(key);
     return tokens.has(key);
   });
-}
-
-function lineMatched(beat, text) {
-  const said = normalize(text);
-  if (!said || !beat) return false;
-  if (said === normalize(beat.text)) return true;
-  if ((beat.alt || []).some((alt) => normalize(alt) === said)) return true;
-  if (hits(text, beat.accept)) return true;
-  if (beat.branch && (beat.branch.options || []).some((opt) => hits(text, opt.keywords))) return true;
-  return false;
 }
 
 function defaultNext(skit, beat) {
@@ -115,8 +108,15 @@ export function createSkitPlayer(opts) {
   let sayResolve = null;
   let sayQueue = '';
   let skipNow = false;
+  let offerSkip = false;
   let rehearseIndex = 0;
   let heard = [];
+  let fromTheater = false;
+
+  function pause(ms) {
+    if (opts.wait) return opts.wait(ms);
+    return delay(ms);
+  }
 
   function beatById(id) {
     if (!skit) return null;
@@ -164,6 +164,8 @@ export function createSkitPlayer(opts) {
       showWords,
       slow,
       feedback,
+      offerSkip,
+      fromTheater,
       heard: heard.slice(),
       subtitle,
       lastLine,
@@ -202,7 +204,8 @@ export function createSkitPlayer(opts) {
     phase = 'roles';
     waiting = false;
     ended = false;
-    feedback = 'Pick a role, or watch again.';
+    offerSkip = false;
+    feedback = fromTheater ? 'Want to take a role?' : 'Pick a role, or watch again.';
     publish();
   }
 
@@ -266,20 +269,45 @@ export function createSkitPlayer(opts) {
     };
     if (opts.yourTurn) opts.yourTurn(true);
     if (opts.armPatience) opts.armPatience();
+    offerSkip = false;
     publish();
+    watchCover(token, beat);
     const text = await waitForLine(token);
     waiting = false;
+    offerSkip = false;
     if (opts.yourTurn) opts.yourTurn(false);
     if (opts.calmPatience) opts.calmPatience();
     if (text == null || token !== run) return null;
-    const matched = lineMatched(beat, text);
-    linesSaid += 1;
-    feedback = matched ? 'Great!' : `Nice try — one way to say it: ${beat.text}`;
-    subtitle = { speaker: 'You', text, zh: beat.zh || '', role: beat.role };
+    const spoken = wordsOf(text).length > 0;
+    if (spoken) linesSaid += 1;
+    feedback = `Nice! Another way to say it: ${beat.text}`;
+    subtitle = {
+      speaker: 'You',
+      text: spoken ? text : beat.text,
+      zh: beat.zh || '',
+      role: beat.role,
+    };
     publish();
-    await delay(620);
+    await pause(620);
     if (token !== run) return null;
-    return text;
+    return spoken ? text : '';
+  }
+
+  function watchCover(token, beat) {
+    (async () => {
+      await pause(COVER_MS);
+      if (token !== run || phase !== 'perform' || !waiting || beatId !== beat.id) return;
+      offerSkip = true;
+      feedback = `Maybe: ${beat.text}`;
+      subtitle = { speaker: 'You', text: beat.text, zh: beat.zh || '', role: beat.role };
+      publish();
+      if (opts.coverLine) {
+        try { opts.coverLine(beat); } catch (err) { /* the skip offer still stands */ }
+      }
+      await pause(COVER_SKIP_MS);
+      if (token !== run || phase !== 'perform' || !waiting || beatId !== beat.id) return;
+      dropSay('');
+    })();
   }
 
   function waitForLine(token) {
@@ -326,7 +354,7 @@ export function createSkitPlayer(opts) {
       if (text) {
         feedback = 'Nice.';
         publish();
-        await delay(280);
+        await pause(280);
       }
     }
     if (token === run) await runPerform(token);
@@ -359,6 +387,8 @@ export function createSkitPlayer(opts) {
     feedback = '';
     sayQueue = '';
     skipNow = false;
+    offerSkip = false;
+    fromTheater = false;
     if (slow && opts.setSlow) opts.setSlow(false);
     slow = false;
     if (opts.yourTurn) opts.yourTurn(false);
@@ -370,11 +400,12 @@ export function createSkitPlayer(opts) {
     return true;
   }
 
-  function start(id) {
+  function start(id, options) {
     const next = opts.getSkit(id);
     if (!next) return false;
     if (phase !== 'idle') leave();
     skit = next;
+    fromTheater = !!(options && options.theater);
     role = '';
     hintLevel = 0;
     linesSaid = 0;
@@ -391,10 +422,11 @@ export function createSkitPlayer(opts) {
     const token = bump();
     phase = 'watch';
     if (opts.mute) opts.mute();
-    if (opts.place) opts.place(skit);
     publish();
     (async () => {
       try {
+        if (opts.place) await opts.place(skit);
+        if (token !== run) return;
         if (opts.claimFloor) await opts.claimFloor(skit);
         if (token !== run) return;
         await runWatch(token);
@@ -480,6 +512,10 @@ export function createSkitPlayer(opts) {
 
   function skipLine() {
     if (phase === 'watch') return skipToRoles();
+    if (phase === 'perform' && waiting && offerSkip) {
+      dropSay('');
+      return true;
+    }
     if (phase !== 'rehearse') return false;
     skipNow = true;
     if (opts.cancelLines) opts.cancelLines();
@@ -546,6 +582,7 @@ export function createSkitPlayer(opts) {
     linesSaid = 0;
     ended = false;
     sayQueue = '';
+    offerSkip = false;
     feedback = '';
     const token = bump();
     if (opts.cancelLines) opts.cancelLines();

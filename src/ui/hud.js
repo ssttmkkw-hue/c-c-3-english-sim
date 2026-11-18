@@ -994,7 +994,9 @@ export function createHUD() {
         button.dataset.hint = level;
         skitControls.appendChild(button);
       }
-      skitControls.append(skitButton('Tap to read', 'read'), skitButton('Leave', 'leave'));
+      skitControls.append(skitButton('Tap to read', 'read'));
+      if (model.offerSkip) skitControls.append(skitButton('Skip this line', 'skip-line'));
+      skitControls.append(skitButton('Leave', 'leave'));
       appendSkitSay('Say it your way');
     } else if (model.phase === 'curtain') {
       skitControls.append(
@@ -1071,7 +1073,7 @@ export function createHUD() {
       }
     }
     skitFeedbackEl.textContent = model.feedback || '';
-    const key = [model.phase, model.beat, model.role, model.rehearseIndex, model.waiting ? 1 : 0].join('|');
+    const key = [model.phase, model.beat, model.role, model.rehearseIndex, model.waiting ? 1 : 0, model.offerSkip ? 1 : 0].join('|');
     if (key !== skitKey) {
       skitKey = key;
       paintSkitControls(model);

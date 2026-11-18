@@ -20,7 +20,7 @@ import { ScriptedProvider } from './dialogue/ScriptedProvider.js';
 import { alignPhrase, normalize } from './dialogue/match.js';
 import { createNotebook } from './progress/notebook.js';
 import { createMissions } from './progress/missions.js';
-import { SKITS, SKIT_SPOTS, skitById, skitsInZone, groupIdForSkit, spotForSkit } from './data/skits/index.js';
+import { SKITS, SKIT_SPOTS, skitById, skitsInZone, groupIdForSkit, spotForSkit, missingCast } from './data/skits/index.js';
 import { createSkitPlayer } from './skits/SkitPlayer.js';
 // AIProvider in ./dialogue/AIProvider.js is an unwired stub (no API key).
 
@@ -50,6 +50,8 @@ const npcs = CHARACTERS.map((def) => {
   return npc;
 });
 const byName = new Map(npcs.map((npc) => [npc.def.name, npc]));
+const castGaps = missingCast(byName);
+if (castGaps.length) console.warn('Skit role has no avatar', castGaps);
 
 const groups = {};
 for (const [groupId, zoneKey] of Object.entries(GROUP_ZONE)) {
@@ -183,6 +185,27 @@ skit = createSkitPlayer({
     if (skitGroup) skitGroup.director.setPatience(false);
   },
   yourTurn(on) { player.setCue(!!on); },
+  wait(ms) {
+    const seconds = Math.max(0, Number(ms) || 0) / 1000;
+    const target = now + seconds;
+    return new Promise((resolve) => {
+      const step = () => {
+        if (now + 1e-4 >= target) resolve();
+        else requestAnimationFrame(step);
+      };
+      step();
+    });
+  },
+  coverLine(beat) {
+    if (!skitGroup || !beat) return;
+    const item = skitById(skit.state().id);
+    const other = item && item.cast.find((member) => member.role !== beat.role && member.npc);
+    const npc = other && byName.get(other.npc);
+    if (!npc) return;
+    const pos = player.avatar.root.position;
+    npc.face(pos.x, pos.z);
+    npc.say(`Maybe: ${beat.text}`, now, 4.2, 'back');
+  },
   setSlow(on) {
     if (on) {
       skitBaseScale = timeScale;
@@ -1545,6 +1568,8 @@ window.__sim = {
   },
   startSkit: (id) => startSkit(id),
   skipToRoles: () => skit.skipToRoles(),
+  skipLine: () => skit.skipLine(),
+  castCheck: () => missingCast(byName),
   pickRole: (role) => skit.pickRole(role),
   rehearse: (role) => skit.rehearse(role),
   skitSay: (text) => skit.skitSay(text, 'text'),
@@ -1558,6 +1583,7 @@ window.__sim = {
       linesSaid: state.linesSaid,
       ended: state.ended,
       waiting: state.waiting,
+      offerSkip: state.offerSkip,
       feedback: state.feedback,
       lastLine: state.lastLine,
       showWords: state.showWords,
