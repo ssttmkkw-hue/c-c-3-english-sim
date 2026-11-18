@@ -1,4 +1,4 @@
-import { animateAvatar, createAvatar, triggerReact } from './avatar.js';
+import { animateAvatar, createAvatar, setAvatarLook, triggerReact } from './avatar.js';
 import { blocked, overlapAmount } from '../world/zones.js';
 
 export function createPlayer(colliders) {
@@ -7,6 +7,8 @@ export function createPlayer(colliders) {
     kind: 'player',
     color: 0x5c6bc0,
     accent: 0xffe0bd,
+    unique: true,
+    look: { hair: 'short', hairColor: 0x3e2723, outfit: 'shirt' },
   });
   avatar.root.position.set(0, 0, 0);
   const anim = { phase: 0, react: null, reactT: 0 };
@@ -57,6 +59,14 @@ export function createPlayer(colliders) {
     radius,
     react(kind) {
       triggerReact(anim, kind);
+    },
+    applyLook(look) {
+      const next = look || {};
+      setAvatarLook(avatar, {
+        color: next.color,
+        hair: next.hair,
+        name: next.name || 'You',
+      });
     },
   };
 }
