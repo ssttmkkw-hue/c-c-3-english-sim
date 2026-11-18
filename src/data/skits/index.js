@@ -1,8 +1,9 @@
 import { LATTE_SKIT } from './latte.js';
 import { LATE_CLASS_SKIT } from './late-class.js';
+import { CHECKIN_SKIT } from './check-in.js';
 import { groupIdForZone, skitSpots } from '../../world/zones.js';
 
-export const SKITS = [LATTE_SKIT, LATE_CLASS_SKIT];
+export const SKITS = [LATTE_SKIT, LATE_CLASS_SKIT, CHECKIN_SKIT];
 
 export function skitById(id) {
   const key = String(id || '').trim();

@@ -2,6 +2,7 @@ import { cafeGraphs } from './zones/cafe.js';
 import { parkGraphs } from './zones/park.js';
 import { classGraphs } from './zones/classroom.js';
 import { shopGraphs } from './zones/shop.js';
+import { hotelGraphs } from './zones/hotel.js';
 import { soloGraphs } from './zones/solos.js';
 import { applyLegacyZh } from './zh-legacy.js';
 
@@ -224,6 +225,46 @@ export const AMBIENT = {
         }),
         ambientLine('hat-hold', 'Clerk Sam', 'No rush at all. I can hold the small jacket for you.', {
           to: 'Player: Omar_22',
+        }),
+      ],
+    },
+  ],
+  'hotel.ambient': [
+    {
+      id: 'checkout',
+      lines: [
+        ambientLine('out-ask', 'Player: Guest_Ana', 'What time is checkout tomorrow?', {
+          to: 'Clerk Nia',
+          zh: '明天几点退房？',
+        }),
+        ambientLine('out-time', 'Clerk Nia', 'Checkout is at eleven. I can store your bags after that.', {
+          to: 'Player: Guest_Ana',
+          zh: '退房时间是十一点。之后我可以帮你存行李。',
+          react: [{ who: 'Player: Guest_Ben', kind: 'nod', at: 0.55 }],
+        }),
+        ambientLine('out-ok', 'Player: Guest_Ben', 'Eleven is fine. We will come down a little early.', {
+          to: 'Clerk Nia',
+          zh: '十一点可以。我们会稍早一点下来。',
+          quick: true,
+        }),
+      ],
+    },
+    {
+      id: 'breakfast-where',
+      lines: [
+        ambientLine('brk-ask', 'Player: Guest_Ben', 'Where do we go for breakfast?', {
+          to: 'Clerk Nia',
+          zh: '早餐去哪里吃？',
+        }),
+        ambientLine('brk-lift', 'Clerk Nia', 'Past the lift, on the left. It starts at seven.', {
+          to: 'Player: Guest_Ben',
+          zh: '过了电梯，在左边。七点开始。',
+          quick: true,
+          back: [{ who: 'Player: Guest_Ana', text: 'Nice', at: 0.62 }],
+        }),
+        ambientLine('brk-seat', 'Player: Guest_Ana', 'Let us go at eight and sit by the window.', {
+          to: 'Player: Guest_Ben',
+          zh: '我们八点去，坐在窗边。',
         }),
       ],
     },
@@ -780,6 +821,7 @@ export const GRAPHS = {
   ...parkGraphs,
   ...classGraphs,
   ...shopGraphs,
+  ...hotelGraphs,
   ...soloGraphs,
 };
 

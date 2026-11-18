@@ -15,4 +15,7 @@ export const GROUP_CONVERSATIONS = [
   { id: 'shop.join', zone: 'shop', title: 'Buying a jacket', level: 'beginner' },
   { id: 'shop.gift', zone: 'shop', title: 'Choosing a gift', level: 'beginner' },
   { id: 'shop.return', zone: 'shop', title: 'Returns and exchanges', level: 'intermediate' },
+
+  { id: 'hotel.join', zone: 'hotel', title: 'Checking in', level: 'beginner' },
+  { id: 'hotel.breakfast', zone: 'hotel', title: 'Breakfast at the hotel', level: 'beginner' },
 ];

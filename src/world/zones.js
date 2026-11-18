@@ -94,6 +94,21 @@ export const ZONES = [
       { x: -4.5, z: 44.6 }, { x: -1.5, z: 44.6 }, { x: 1.5, z: 44.6 }, { x: 4.5, z: 44.6 },
     ],
   },
+  {
+    id: 'hotel',
+    name: 'Hotel Desk',
+    minX: 30, maxX: 52, minZ: -14, maxZ: 14,
+    floor: 0xb0bec5,
+    anchor: [40, 0],
+    spawn: [36, 2.2],
+    groupId: 'hotel',
+    dialogue: 'hotel.join',
+    ambient: 'hotel.ambient',
+    island: true,
+    neighbors: [],
+    portal: { x: 32.2, z: 0 },
+    skitSpots: [{ id: 'check-in-desk', x: 36.6, z: -4.2 }],
+  },
 ];
 
 export function zoneById(id) {

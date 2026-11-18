@@ -21,6 +21,10 @@ export const CHARACTERS = [
   { id: 'jo', name: 'Musician Jo', kind: 'npc', color: 0xc62828, accent: 0xffe0bd, zone: 'park', group: null, solo: 'jo.solo', home: [9.2, -19.4], angle: 1.1, voice: 2, look: { hair: 'spiky', hairColor: 0x1b1b1b, outfit: 'jacket' } },
   { id: 'bea', name: 'Customer Bea', kind: 'player', color: 0x00897b, accent: 0xffccbc, zone: 'shop', group: null, solo: 'bea.solo', home: [18.4, 9.2], angle: 2.2, voice: 5, look: { hair: 'bob', hairColor: 0x5d4037, outfit: 'shirt' } },
 
+  { id: 'nia', name: 'Clerk Nia', kind: 'npc', color: 0x1565c0, accent: 0xffe0bd, zone: 'hotel', group: 'hotel', solo: null, angle: 0.15, voice: 1, look: { hair: 'bun', hairColor: 0x3e2723, outfit: 'jacket' } },
+  { id: 'ana', name: 'Player: Guest_Ana', kind: 'player', color: 0xf06292, accent: 0xffe0bd, zone: 'hotel', group: 'hotel', solo: null, angle: 2.5, voice: 3, look: { hair: 'bob', hairColor: 0x5d4037, outfit: 'jacket' } },
+  { id: 'ben', name: 'Player: Guest_Ben', kind: 'player', color: 0x00897b, accent: 0xf0c8a0, zone: 'hotel', group: 'hotel', solo: null, angle: 4.3, voice: 4, look: { hair: 'short', hairColor: 0x212121, outfit: 'shirt' } },
+
   { id: 'ren', name: 'Audience Ren', kind: 'npc', color: 0x5c6bc0, accent: 0xffe0bd, zone: 'playhouse', group: null, solo: null, home: [-7.2, 39.15], angle: 0, voice: 2, look: { hair: 'short', hairColor: 0x3e2723, outfit: 'jacket' } },
   { id: 'sol', name: 'Audience Sol', kind: 'player', color: 0xec407a, accent: 0xffe0bd, zone: 'playhouse', group: null, solo: null, home: [7.2, 39.15], angle: 0, voice: 1, look: { hair: 'bob', hairColor: 0x4e342e, outfit: 'shirt' } },
 

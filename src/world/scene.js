@@ -109,7 +109,22 @@ export function createScene() {
     for (const seat of playhouse.seats || []) makeChair(props, seat.x, seat.z, Math.PI);
     if (playhouse.board) showBoard = makeShowBoard(props, playhouse.board.x, playhouse.board.z);
     const door = playhouse.portal || { x: 0, z: 30 };
-    addPlayhouseSign(scene, door.x + 3.2, door.z + 0.4);
+    addIslandSign(scene, 'Playhouse', 'Sit and watch', '#7e57c2', door.x + 3.2, door.z + 0.4);
+  }
+  const hotel = ZONES.find((zone) => zone.id === 'hotel');
+  if (hotel) {
+    makeCounter(props, 47.2, 0, 6.2, Math.PI / 2, colliders, 0x1565c0);
+    makePlant(props, 33.4, 10.2, colliders);
+    makePlant(props, 33.2, -10.4, colliders);
+    makePlant(props, 49.4, 10.6, colliders);
+    const bell = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffd54f, metalness: 0.35, roughness: 0.4 })
+    );
+    bell.position.set(46.2, 1.2, 0.8);
+    bell.castShadow = true;
+    props.add(bell);
+    addIslandSign(scene, 'Hotel', 'Check in', '#1565c0', 33.6, 3.4);
   }
   const portalRings = [];
   for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));
@@ -136,7 +151,7 @@ export function createScene() {
   return { scene, colliders, portalRings, sun, showBoard };
 }
 
-function addPlayhouseSign(scene, x, z) {
+function addIslandSign(scene, title, sub, color, x, z) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 256;
@@ -144,16 +159,16 @@ function addPlayhouseSign(scene, x, z) {
   ctx.fillStyle = 'rgba(16,32,39,0.9)';
   roundSign(ctx, 16, 28, 480, 180, 28);
   ctx.fill();
-  ctx.fillStyle = '#7e57c2';
+  ctx.fillStyle = color;
   ctx.fillRect(16, 28, 18, 180);
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 64px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Playhouse', 270, 100);
+  ctx.fillText(title, 270, 100);
   ctx.fillStyle = '#ffe082';
   ctx.font = '32px sans-serif';
-  ctx.fillText('Sit and watch', 270, 162);
+  ctx.fillText(sub, 270, 162);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   const board = new THREE.Mesh(

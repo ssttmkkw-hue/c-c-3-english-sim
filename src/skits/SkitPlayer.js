@@ -112,6 +112,7 @@ export function createSkitPlayer(opts) {
   let rehearseIndex = 0;
   let heard = [];
   let fromTheater = false;
+  let floorReady = Promise.resolve();
 
   function pause(ms) {
     if (opts.wait) return opts.wait(ms);
@@ -429,15 +430,15 @@ export function createSkitPlayer(opts) {
     phase = 'watch';
     if (opts.mute) opts.mute();
     publish();
-    (async () => {
+    floorReady = (async () => {
       try {
         if (opts.place) await opts.place(skit);
-        if (token !== run) return;
+        if (phase === 'idle') return;
         if (opts.claimFloor) await opts.claimFloor(skit);
-        if (token !== run) return;
+        if (token !== run || phase !== 'watch') return;
         await runWatch(token);
       } catch (err) {
-        if (token === run) {
+        if (token === run && phase !== 'idle') {
           feedback = 'The scene paused. You can leave and try again.';
           publish();
         }
@@ -470,7 +471,10 @@ export function createSkitPlayer(opts) {
     const token = bump();
     if (opts.cancelLines) opts.cancelLines();
     if (opts.stopSpeak) opts.stopSpeak();
-    runPerform(token);
+    floorReady.then(() => {
+      if (token !== run || phase === 'idle') return;
+      return runPerform(token);
+    });
     return true;
   }
 
@@ -486,7 +490,10 @@ export function createSkitPlayer(opts) {
     const token = bump();
     if (opts.cancelLines) opts.cancelLines();
     if (opts.stopSpeak) opts.stopSpeak();
-    runRehearse(token);
+    floorReady.then(() => {
+      if (token !== run || phase === 'idle') return;
+      return runRehearse(token);
+    });
     return true;
   }
 
@@ -578,7 +585,10 @@ export function createSkitPlayer(opts) {
     if (opts.yourTurn) opts.yourTurn(false);
     phase = 'watch';
     publish();
-    runWatch(token);
+    floorReady.then(() => {
+      if (token !== run || phase !== 'watch') return;
+      return runWatch(token);
+    });
     return true;
   }
 
