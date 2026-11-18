@@ -103,7 +103,7 @@ export const LEGACY_ZH = {
   "My name is Alex, and I like music.": "我叫 Alex，我喜欢音乐。",
   "Nice to meet you. Quick question: which sentence is correct? A) I have lived here since two years. B) I have lived here for two years.": "很高兴认识你。快问：哪一句是对的？A) I have lived here since two years. B) I have lived here for two years.",
   "B. We use for with a length of time.": "B。一段时间用 for。",
-  "A. Since two years.": "A。Since two years。",
+  "A. Since two years.": "选 A：since two years。（不对，一段时间要用 for）",
   "Close. Since needs a starting point, like since 2022. For needs a duration, like for two years.": "很接近。since 需要一个起点，比如 since 2022。for 需要一段时长，比如 for two years。",
   "Then B is correct: for two years.": "那么 B 是对的：for two years。",
   "Yes. That is the present perfect with for. Well done.": "对。这是带 for 的现在完成时。做得好。",
@@ -119,6 +119,13 @@ export const LEGACY_ZH = {
   "Lovely work. Come back any time you want more practice.": "做得好。想多练习的时候随时回来。",
   "You did great. See you next class.": "你表现得很好。下节课见。",
   "I have lived here for two years.": "我在这里住了两年。",
+  "I slept well, thank you.": "我睡得很好，谢谢。",
+  "I studied English yesterday.": "我昨天学了英语。",
+  "I will write three sentences.": "我会写三个句子。",
+  "Excuse me, I am a bit lost.": "打扰一下，我有点迷路了。",
+  "How do I get to the cafe?": "咖啡馆怎么走？",
+  "It is a short walk.": "走过去很近。",
+  "Do you like music?": "你喜欢音乐吗？",
   "Could you say that again?": "你能再说一遍吗？",
   "Hi! Looking for something special today?": "你好！今天在找特别的东西吗？",
   "We are comparing prices. Ask Sam anything.": "我们在比较价格。有问题就问 Sam。",
@@ -256,29 +263,56 @@ export const LEGACY_ZH = {
   "You have got this. A useful line is \"Could you say that again, please?\" See you around the plaza.": "你能行的。一句有用的话是 Could you say that again, please? 广场上见。"
 };
 
+function hasZh(zh) {
+  return !!(zh && /[\u4e00-\u9fff]/.test(zh));
+}
+
+function fillZh(text, zh) {
+  if (hasZh(zh)) return zh;
+  return LEGACY_ZH[text] || '';
+}
+
 export function applyLegacyZh(graphs, ambient, visitors) {
   for (const graph of Object.values(graphs)) {
     for (const node of Object.values(graph.nodes || {})) {
       node.lines = (node.lines || []).map((line) => {
-        if (typeof line === 'string') return { text: line, zh: LEGACY_ZH[line] || '' };
-        if (!line.zh) return { ...line, zh: LEGACY_ZH[line.text] || '' };
-        return line;
+        if (typeof line === 'string') return { text: line, zh: fillZh(line, '') };
+        return { ...line, zh: fillZh(line.text, line.zh) };
       });
       for (const choice of node.choices || []) {
-        if (!choice.zh) choice.zh = LEGACY_ZH[choice.text] || '';
+        choice.zh = fillZh(choice.text, choice.zh);
       }
     }
   }
   for (const lines of Object.values(ambient || {})) {
     for (const line of lines) {
-      if (line && !line.zh) line.zh = LEGACY_ZH[line.text] || '';
+      if (line) line.zh = fillZh(line.text, line.zh);
     }
   }
   for (const [id, lines] of Object.entries(visitors || {})) {
     visitors[id] = lines.map((item) => {
-      if (typeof item === 'string') return { text: item, zh: LEGACY_ZH[item] || '' };
-      if (!item.zh) item.zh = LEGACY_ZH[item.text] || '';
-      return item;
+      if (typeof item === 'string') return { text: item, zh: fillZh(item, '') };
+      return { ...item, zh: fillZh(item.text, item.zh) };
     });
+  }
+  const known = new Map();
+  const remember = (text, zh) => {
+    if (text && hasZh(zh) && !known.has(text)) known.set(text, zh);
+  };
+  for (const graph of Object.values(graphs)) {
+    for (const node of Object.values(graph.nodes || {})) {
+      for (const line of node.lines || []) remember(line.text, line.zh);
+      for (const choice of node.choices || []) remember(choice.text, choice.zh);
+    }
+  }
+  for (const graph of Object.values(graphs)) {
+    for (const node of Object.values(graph.nodes || {})) {
+      if (!node.phrases) continue;
+      node.phrases = node.phrases.map((phrase) => {
+        const text = typeof phrase === 'string' ? phrase : (phrase && phrase.text) || '';
+        const own = typeof phrase === 'object' && phrase ? phrase.zh : '';
+        return { text, zh: fillZh(text, own) || known.get(text) || '' };
+      });
+    }
   }
 }

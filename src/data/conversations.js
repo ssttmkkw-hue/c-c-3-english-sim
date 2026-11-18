@@ -600,3 +600,45 @@ export const GRAPHS = {
 };
 
 applyLegacyZh(GRAPHS, AMBIENT, VISITOR_LINES);
+
+const CJK = /[\u4e00-\u9fff]/;
+
+/**
+ * Lists dialogue strings that have no Chinese.
+ * Covers NPC lines, reply choices, recap phrases, ambient lines, and visitor lines.
+ * Hint text is the opening words of a choice, so a choice with zh covers it.
+ * @returns {{ kind: string, id: string, text: string }[]}
+ */
+export function missingZh() {
+  const missing = [];
+  const add = (kind, id, text, zh) => {
+    const value = String(text || '').trim();
+    if (!value) return;
+    if (zh && CJK.test(zh)) return;
+    missing.push({ kind, id, text: value });
+  };
+  for (const [gid, graph] of Object.entries(GRAPHS)) {
+    for (const [nid, node] of Object.entries(graph.nodes || {})) {
+      const where = `${gid}.${nid}`;
+      for (const line of node.lines || []) {
+        if (typeof line === 'string') add('line', where, line, '');
+        else add('line', where, line.text, line.zh);
+      }
+      for (const choice of node.choices || []) add('choice', where, choice.text, choice.zh);
+      for (const phrase of node.phrases || []) {
+        if (typeof phrase === 'string') add('phrase', where, phrase, '');
+        else add('phrase', where, phrase.text, phrase.zh);
+      }
+    }
+  }
+  for (const [id, lines] of Object.entries(AMBIENT)) {
+    for (const line of lines) add('ambient', id, line.text, line.zh);
+  }
+  for (const [id, lines] of Object.entries(VISITOR_LINES)) {
+    for (const line of lines) {
+      if (typeof line === 'string') add('visitor', id, line, '');
+      else add('visitor', id, line.text, line.zh);
+    }
+  }
+  return missing;
+}

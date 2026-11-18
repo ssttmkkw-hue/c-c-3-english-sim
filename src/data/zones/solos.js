@@ -55,25 +55,25 @@ export const soloGraphs = {
       am: node('Librarian Ada', [
         line('Librarian Ada', 'Fill the gap: I ___ a student. Which verb fits with I?', '填空：I ___ a student。哪个动词和 I 搭配？'),
       ], [
-        choice('I am a student.', 'I am a student。', ['am'], 'she'),
-        choice('I is a student.', 'I is a student。', ['is'], 'fix'),
+        choice('I am a student.', '我是学生。', ['am'], 'she'),
+        choice('I is a student.', '我是学生。（这句不对：I 后面要用 am）', ['is'], 'fix'),
       ]),
       fix: node('Librarian Ada', [
         line('Librarian Ada', 'Close. Use am with I, and is with he or she. Try the first one again.', '很接近。I 用 am，he 或 she 用 is。再试第一句。'),
       ], [
-        choice('I am a student.', 'I am a student。', ['am'], 'she'),
+        choice('I am a student.', '我是学生。', ['am'], 'she'),
         choice('Could you say that again?', '你能再说一次吗？', ['again', 'repeat'], 'she'),
       ]),
       she: node('Librarian Ada', [
         line('Librarian Ada', 'Good. Now try: She ___ from Seoul.', '很好。现在试：She ___ from Seoul。'),
       ], [
-        choice('She is from Seoul.', 'She is from Seoul。', ['is', 'seoul'], 'polite'),
-        choice('She are from Seoul.', 'She are from Seoul。', ['are'], 'fixshe'),
+        choice('She is from Seoul.', '她来自首尔。', ['is', 'seoul'], 'polite'),
+        choice('She are from Seoul.', '她来自首尔。（这句不对：she 后面要用 is）', ['are'], 'fixshe'),
       ]),
       fixshe: node('Librarian Ada', [
         line('Librarian Ada', 'Use is with she: She is from Seoul. Are is for you, we, and they.', 'she 要用 is：She is from Seoul。are 用于 you、we 和 they。'),
       ], [
-        choice('She is from Seoul.', 'She is from Seoul。', ['is', 'seoul'], 'polite'),
+        choice('She is from Seoul.', '她来自首尔。', ['is', 'seoul'], 'polite'),
         choice('Thanks, I will remember is.', '谢谢，我会记住用 is。', ['remember', 'is', 'thanks'], 'polite'),
       ]),
       polite: node('Librarian Ada', [
