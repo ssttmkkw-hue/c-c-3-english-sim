@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Plaza English</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud">
+    <header id="top">
+      <div id="zone-name">Plaza</div>
+      <div id="mic-state" data-state="idle">Mic idle</div>
+      <label id="tts-label"><input type="checkbox" id="tts" /> Read lines aloud</label>
+    </header>
+    <div id="ambient" class="hidden"></div>
+    <div id="prompt" class="hidden"></div>
+    <section id="chat" class="hidden">
+      <div id="chat-log"></div>
+      <div id="choices"></div>
+      <form id="say-form">
+        <input id="say" type="text" maxlength="160" placeholder="Type a reply, or hold Space / the mic button" autocomplete="off" />
+        <button type="submit">Send</button>
+        <button type="button" id="mic-btn">Hold to talk</button>
+        <button type="button" id="leave">Leave</button>
+      </form>
+    </section>
+  </div>
+  <div id="touch">
+    <div id="stick" aria-hidden="true"><div id="knob"></div></div>
+    <div id="touch-actions">
+      <button type="button" id="btn-join" class="hidden">Join</button>
+      <button type="button" id="btn-talk" class="hidden">Talk</button>
+    </div>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

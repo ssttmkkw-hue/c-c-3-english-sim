@@ -1,0 +1,126 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #b3e5fc;
+  font-family: "Segoe UI", sans-serif;
+  color: #102027;
+  touch-action: none;
+}
+#view { display: block; width: 100vw; height: 100vh; }
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+}
+#top, #prompt, #ambient, #chat, #touch, #touch button, #say-form button, #say {
+  pointer-events: auto;
+}
+#top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#zone-name, #mic-state, #tts-label, #prompt, #ambient, #chat {
+  background: rgba(16, 32, 39, 0.78);
+  color: #fff;
+  border-radius: 12px;
+}
+#zone-name { padding: 10px 14px; font-weight: 700; letter-spacing: 0.02em; }
+#mic-state { padding: 8px 12px; font-size: 14px; }
+#mic-state[data-state="listening"] { background: #c62828; }
+#mic-state[data-state="unsupported"] { background: #546e7a; }
+#tts-label { padding: 8px 12px; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+#ambient {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  width: min(320px, 40vw);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  max-height: 28vh;
+  overflow: auto;
+}
+.ambient-title { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #b3e5fc; }
+#ambient p { margin: 0 0 6px; }
+#prompt {
+  align-self: center;
+  margin-bottom: 8px;
+  padding: 10px 16px;
+  text-align: center;
+}
+#prompt p { margin: 4px 0; }
+#chat {
+  width: min(640px, 100%);
+  align-self: center;
+  padding: 12px;
+}
+#chat-log {
+  max-height: 28vh;
+  overflow: auto;
+  font-size: 15px;
+}
+#chat-log p { margin: 0 0 8px; }
+#chat-log strong { color: #ffe082; margin-right: 6px; }
+#chat-log .you strong { color: #80d8ff; }
+#choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+#choices button, #say-form button, #touch-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #ffe082;
+  color: #102027;
+  font-weight: 600;
+  cursor: pointer;
+}
+#say-form { display: flex; gap: 8px; flex-wrap: wrap; }
+#say {
+  flex: 1 1 180px;
+  border-radius: 999px;
+  border: 0;
+  padding: 10px 14px;
+  font: inherit;
+}
+#leave { background: #eceff1; }
+.hidden { display: none !important; }
+#touch { display: none; position: fixed; inset: auto 0 18px 0; height: 140px; pointer-events: none; }
+body.touch #touch { display: block; }
+#stick {
+  position: absolute;
+  left: 24px;
+  bottom: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(16, 32, 39, 0.35);
+  border: 2px solid rgba(255,255,255,0.7);
+  pointer-events: auto;
+  touch-action: none;
+}
+#knob {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  position: absolute;
+  left: 34px;
+  top: 34px;
+}
+#touch-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+#touch-actions button { min-width: 140px; padding: 12px 14px; }
+body.touch #chat { margin-bottom: 120px; }
