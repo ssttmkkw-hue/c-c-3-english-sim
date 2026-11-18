@@ -13,12 +13,40 @@ export function createHUD() {
   const talkBtn = document.querySelector('#btn-talk');
   const micBtn = document.querySelector('#mic-btn');
   const transcriptEl = document.querySelector('#transcript');
+  const typingEl = document.querySelector('#typing');
+  const waitEl = document.querySelector('#wait-hint');
+  const endBox = document.querySelector('#end-box');
+  const statsEl = document.querySelector('#stats');
+  const helpEl = document.querySelector('#help');
+  const helpBtn = document.querySelector('#help-btn');
+  const helpClose = document.querySelector('#help-close');
+  const talkAgainBtn = document.querySelector('#talk-again');
+  const leaveEndBtn = document.querySelector('#leave-end');
 
   const MIC_TITLE = 'Speech recognition needs Chrome or Edge, and the page must be on localhost or https. Firefox and insecure http pages do not expose the mic API.';
 
   let onChoice = () => {};
   let onSend = () => {};
   let onLeave = () => {};
+  let onAgain = () => {};
+  const HELP_KEY = 'plaza-english-help-v1';
+
+  function setHelp(show) {
+    helpEl.classList.toggle('hidden', !show);
+    if (!show) {
+      try { localStorage.setItem(HELP_KEY, '1'); } catch (err) { /* private mode */ }
+    }
+  }
+  helpBtn.addEventListener('click', () => setHelp(helpEl.classList.contains('hidden')));
+  helpClose.addEventListener('click', () => {
+    try { localStorage.setItem(HELP_KEY, '1'); } catch (err) { /* private mode */ }
+    setHelp(false);
+  });
+  try {
+    if (localStorage.getItem(HELP_KEY) !== '1') setHelp(true);
+  } catch (err) { /* ignore */ }
+  talkAgainBtn.addEventListener('click', () => onAgain());
+  leaveEndBtn.addEventListener('click', () => onLeave());
 
   document.querySelector('#say-form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -87,7 +115,13 @@ export function createHUD() {
 
   function showChat(show) {
     chatEl.classList.toggle('hidden', !show);
+    document.body.classList.toggle('chatting', !!show);
     if (show) logEl.innerHTML = '';
+    if (!show) {
+      typingEl.classList.add('hidden');
+      waitEl.classList.add('hidden');
+      endBox.classList.add('hidden');
+    }
   }
 
   function speakerColor(name) {
@@ -98,8 +132,12 @@ export function createHUD() {
   }
 
   function addLog(speaker, text, kind) {
+    const key = `${speaker}\n${text}`;
+    const last = logEl.lastElementChild;
+    if (last && last.dataset.line === key && (kind || 'npc') !== 'you') return;
     const row = document.createElement('p');
     row.className = kind || 'npc';
+    row.dataset.line = key;
     const who = document.createElement('strong');
     who.textContent = speaker;
     who.style.color = kind === 'you' ? '#80d8ff' : speakerColor(speaker);
@@ -129,6 +167,26 @@ export function createHUD() {
     row.appendChild(list);
     logEl.appendChild(row);
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setTyping(on) {
+    typingEl.classList.toggle('hidden', !on);
+  }
+
+  function setWaiting(on) {
+    waitEl.classList.toggle('hidden', !on);
+  }
+
+  function showEnd(on) {
+    endBox.classList.toggle('hidden', !on);
+  }
+
+  function setStats(conversations, voiceMatches) {
+    statsEl.textContent = `Practice stats: ${conversations} conversations · ${voiceMatches} voice matches`;
+  }
+
+  function helpOpen() {
+    return !helpEl.classList.contains('hidden');
   }
 
   function setChoices(choices) {
@@ -176,6 +234,12 @@ export function createHUD() {
     showChat,
     addLog,
     setChoices,
+    setTyping,
+    setWaiting,
+    showEnd,
+    setStats,
+    setHelp,
+    helpOpen,
     setInterim,
     setTranscript,
     setAmbient,
@@ -189,5 +253,6 @@ export function createHUD() {
     onChoice(fn) { onChoice = fn; },
     onSend(fn) { onSend = fn; },
     onLeave(fn) { onLeave = fn; },
+    onAgain(fn) { onAgain = fn; },
   };
 }

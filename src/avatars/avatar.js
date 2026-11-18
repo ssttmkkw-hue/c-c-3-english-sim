@@ -55,7 +55,7 @@ export function createAvatar({ name, kind, color, accent }) {
   const bubble = makeSpeechBubble();
   root.add(tag, bubble);
 
-  return { root, body, head, armL, armR, legL, legR, bubble, name };
+  return { root, body, head, armL, armR, legL, legR, bubble, tag, name };
 }
 
 export function animateAvatar(avatar, dt, moving, speed, state) {

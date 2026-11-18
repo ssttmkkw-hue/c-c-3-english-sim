@@ -43,7 +43,7 @@ export class ScriptedProvider extends ConversationProvider {
     this.session = null;
   }
 
-  async start(context) {
+  start(context) {
     const graph = this.graphs[context.conversationId];
     if (!graph) {
       return {
@@ -57,19 +57,14 @@ export class ScriptedProvider extends ConversationProvider {
     return present(graph.nodes[graph.start]);
   }
 
-  async respond(userText, context) {
+  respond(userText, context) {
     const graph = this.graphs[context.conversationId] || (this.session && this.graphs[this.session.id]);
     if (!graph || !this.session) {
       return { npcLines: [], choices: [], ended: true };
     }
     const node = graph.nodes[this.session.nodeId];
     if (!node || !node.choices || node.choices.length === 0) {
-      return {
-        npcLines: [{ speaker: node ? node.speaker : 'Guide', text: 'We can stop here. Press Leave when you are ready.' }],
-        choices: [],
-        ended: true,
-        reaction: 'nod',
-      };
+      return { npcLines: [], choices: [], ended: true, reaction: 'nod' };
     }
     const matched = matchChoice(userText, node.choices || []);
     if (!matched) return retryTurn(node);

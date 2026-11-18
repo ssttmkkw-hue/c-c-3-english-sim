@@ -49,7 +49,32 @@ export function createNPC(def, anchor, colliders) {
     state.goal = null;
   }
 
-  function stepToward(tx, tz, speed, dt) {
+  function hitsBody(x, z, bodies) {
+    if (!bodies) return false;
+    for (const body of bodies) {
+      const dx = x - body.x;
+      const dz = z - body.z;
+      const min = radius + body.r;
+      if (dx * dx + dz * dz < min * min) return true;
+    }
+    return false;
+  }
+
+  function tryStep(nx, nz, bodies) {
+    const p = avatar.root.position;
+    let moved = false;
+    if (!blocked(nx, p.z, radius, colliders) && !hitsBody(nx, p.z, bodies)) {
+      avatar.root.position.x = nx;
+      moved = true;
+    }
+    if (!blocked(avatar.root.position.x, nz, radius, colliders) && !hitsBody(avatar.root.position.x, nz, bodies)) {
+      avatar.root.position.z = nz;
+      moved = true;
+    }
+    return moved;
+  }
+
+  function stepToward(tx, tz, speed, dt, bodies) {
     const p = avatar.root.position;
     const dx = tx - p.x;
     const dz = tz - p.z;
@@ -58,16 +83,14 @@ export function createNPC(def, anchor, colliders) {
     const step = Math.min(speed * dt, len);
     const nx = p.x + (dx / len) * step;
     const nz = p.z + (dz / len) * step;
-    if (!blocked(nx, p.z, radius, colliders)) avatar.root.position.x = nx;
-    if (!blocked(avatar.root.position.x, nz, radius, colliders)) avatar.root.position.z = nz;
-    return true;
+    return tryStep(nx, nz, bodies);
   }
 
-  function update(dt, now, paused) {
+  function update(dt, now, paused, bodies) {
     let moving = false;
     let speed = 0;
     if (state.goal) {
-      moving = stepToward(state.goal.x, state.goal.z, 3.4, dt);
+      moving = stepToward(state.goal.x, state.goal.z, 3.4, dt, bodies);
       speed = moving ? 3.4 : 0;
       face(state.goal.faceX, state.goal.faceZ);
     } else if (def.wander && !paused) {
@@ -86,10 +109,10 @@ export function createNPC(def, anchor, colliders) {
       const step = speed * dt;
       const nx = p.x + (dx / len) * step;
       const nz = p.z + (dz / len) * step;
-      if (!blocked(nx, p.z, radius, colliders)) avatar.root.position.x = nx;
-      if (!blocked(avatar.root.position.x, nz, radius, colliders)) avatar.root.position.z = nz;
-      face(state.wanderTarget.x, state.wanderTarget.z);
-      moving = true;
+      const moved = tryStep(nx, nz, bodies);
+      if (!moved) state.wanderTarget = null;
+      face(state.wanderTarget ? state.wanderTarget.x : p.x + dx, state.wanderTarget ? state.wanderTarget.z : p.z + dz);
+      moving = moved;
     }
     animateAvatar(avatar, dt, moving, speed, state);
     if (state.look) lookHeadAt(avatar, state.look.x, state.look.z, dt);
@@ -116,6 +139,10 @@ export function createNPC(def, anchor, colliders) {
     },
     bubbleUntil() {
       return state.bubbleUntil;
+    },
+    silence(time) {
+      state.bubbleUntil = time;
+      avatar.bubble.visible = false;
     },
     distanceTo(x, z) {
       const p = avatar.root.position;

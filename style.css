@@ -27,10 +27,19 @@ html, body {
   align-items: center;
   flex-wrap: wrap;
 }
-#zone-name, #mic-state, #tts-label, #prompt, #ambient, #chat {
+#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn {
   background: rgba(16, 32, 39, 0.78);
   color: #fff;
   border-radius: 12px;
+}
+#stats { padding: 8px 12px; font-size: 13px; }
+#help-btn {
+  border: 0;
+  width: 36px;
+  height: 36px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
 }
 #zone-name { padding: 10px 14px; font-weight: 700; letter-spacing: 0.02em; }
 #mic-state { padding: 8px 12px; font-size: 14px; }
@@ -84,6 +93,48 @@ html, body {
 #chat-log .heard { color: #b2dfdb; font-style: italic; }
 #chat-log .recap { background: rgba(255, 224, 130, 0.16); border-radius: 8px; padding: 8px; }
 #chat-log .recap strong { color: #ffe082; }
+#typing {
+  color: #b3e5fc;
+  letter-spacing: 0.2em;
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+#wait-hint { margin: 6px 0; color: #ffe082; font-size: 14px; }
+#end-box { margin: 8px 0; }
+#end-box p { margin: 0 0 8px; font-weight: 700; }
+#end-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#help {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 32, 39, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 5;
+  padding: 16px;
+}
+#help-card {
+  width: min(520px, 100%);
+  background: #102027;
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px 18px 14px;
+  max-height: min(80vh, 640px);
+  overflow: auto;
+}
+#help-card h2 { margin: 0 0 10px; font-size: 20px; }
+#help-card ul { margin: 0 0 12px; padding-left: 18px; }
+#help-card li { margin: 0 0 8px; line-height: 1.4; }
+#help-close {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: #ffe082;
+  color: #102027;
+  font-weight: 700;
+  cursor: pointer;
+}
 #transcript {
   margin: 6px 0;
   color: #b3e5fc;
@@ -143,4 +194,25 @@ body.touch #touch { display: block; }
   pointer-events: auto;
 }
 #touch-actions button { min-width: 140px; padding: 12px 14px; }
-body.touch #chat { margin-bottom: 120px; }
+body.touch:not(.chatting) #hud { padding-bottom: 168px; }
+body.touch.chatting #touch { bottom: auto; top: 38vh; height: 120px; }
+@media (max-width: 520px) {
+  #hud { padding: 10px; }
+  #minimap { width: 96px; height: 96px; top: 10px; right: 10px; }
+  #chat {
+    width: 100%;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 16px 16px 0 0;
+    max-height: 46vh;
+    overflow: auto;
+  }
+  #chat-log { max-height: 18vh; }
+  body.touch.chatting #touch { top: auto; bottom: 47vh; }
+  #touch-actions { right: 10px; bottom: 8px; }
+  #touch-actions button { min-width: 112px; }
+  #stick { left: 10px; width: 108px; height: 108px; }
+  #say-form button, #mic-btn { min-height: 44px; }
+}

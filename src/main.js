@@ -71,9 +71,32 @@ let playToken = 0;
 let micHeld = false;
 let lastNpcLine = '';
 let choiceList = [];
+let pendingReply = null;
+const STATS_KEY = 'plaza-english-stats';
+const stats = loadStats();
+
+function loadStats() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STATS_KEY) || '{}');
+    return {
+      conversations: Number(saved.conversations) || 0,
+      voiceMatches: Number(saved.voiceMatches) || 0,
+    };
+  } catch (err) {
+    return { conversations: 0, voiceMatches: 0 };
+  }
+}
+
+function saveStats() {
+  hud.setStats(stats.conversations, stats.voiceMatches);
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (err) { /* ignore */ }
+}
 
 const camDesired = new THREE.Vector3();
+const lookDesired = new THREE.Vector3(0, 1.2, 0);
+const lookSmoothed = new THREE.Vector3(0, 1.2, 0);
 const bubbleAnchor = new THREE.Vector3();
+saveStats();
 const mapCanvas = document.querySelector('#minimap');
 const mapCtx = mapCanvas.getContext('2d');
 
@@ -93,13 +116,31 @@ function voiceOf(name) {
   return npc ? npc.def.voice : 0;
 }
 
-async function playTurn(turn, token) {
-  if (!session || token !== playToken) return;
+function applyTurn(turn, token, source) {
+  if (!turn || !session || token !== playToken) return;
   session.busy = true;
+  session.ended = !!turn.ended;
+  choiceList = [];
   hud.setChoices([]);
-  for (const line of turn.npcLines) {
-    if (token !== playToken) return;
+  hud.setTyping(!turn.ended || (turn.npcLines && turn.npcLines.length > 0));
+  hud.setWaiting(false);
+  hud.showEnd(false);
+  playTurn(turn, token, source);
+}
+
+async function playTurn(turn, token, source) {
+  if (!session || token !== playToken) return;
+  const lines = turn.npcLines || [];
+  if (lines.length) hud.setTyping(true);
+  for (const line of lines) {
+    if (token !== playToken || !session) return;
+    const key = `${line.speaker}|${line.text}`;
+    if (key === session.lastLineKey) continue;
+    session.lastLineKey = key;
     const npc = byName.get(line.speaker);
+    for (const other of npcs) {
+      if (other !== npc) other.silence(now);
+    }
     if (npc) {
       npc.say(line.text, now);
       npc.react(turn.reaction || 'nod');
@@ -110,15 +151,40 @@ async function playTurn(turn, token) {
     if (hud.ttsEnabled()) speakLine(line.text, voiceOf(line.speaker));
     await wait(Math.min(2800, 900 + line.text.length * 22));
   }
-  if (token !== playToken) return;
-  if (turn.heard) hud.addHeard(turn.heard);
-  choiceList = turn.choices || [];
-  hud.setChoices(choiceList);
-  session.ended = !!turn.ended;
+  if (token !== playToken || !session) return;
+  if (turn.heard) {
+    hud.addHeard(turn.heard);
+    if (source === 'voice') {
+      stats.voiceMatches += 1;
+      saveStats();
+    }
+  }
+  hud.setTyping(false);
   session.busy = false;
   if (turn.ended) {
+    choiceList = [];
+    hud.setChoices([]);
     hud.addRecap(turn.phrases || []);
-    hud.addLog('System', 'Press Esc or Leave when you want to step away.', 'you');
+    hud.showEnd(true);
+    if (!session.counted) {
+      session.counted = true;
+      stats.conversations += 1;
+      saveStats();
+    }
+    pendingReply = null;
+    hud.setWaiting(false);
+    return;
+  }
+  choiceList = (turn.choices || []).map((choice) => ({
+    text: choice.text,
+    keywords: choice.keywords || [],
+  }));
+  hud.setChoices(choiceList);
+  if (pendingReply) {
+    const next = pendingReply;
+    pendingReply = null;
+    hud.setWaiting(false);
+    submitText(next.text, next.source);
   }
 }
 
@@ -162,8 +228,14 @@ async function openConversation(conversationId, mode, members) {
   hud.setAmbient([]);
   hud.showChat(true);
   formCircle(members);
-  const turn = await engine.start(session.context);
-  await playTurn(turn, token);
+  hud.showEnd(false);
+  hud.setTyping(true);
+  hud.setWaiting(false);
+  choiceList = [];
+  pendingReply = null;
+  const turn = engine.start(session.context);
+  if (turn && typeof turn.then === 'function') turn.then((value) => applyTurn(value, token, 'script'));
+  else applyTurn(turn, token, 'script');
 }
 
 function closeConversation() {
@@ -175,6 +247,7 @@ function closeConversation() {
     npc.clearLook();
   }
   choiceList = [];
+  pendingReply = null;
   session = null;
   stopSpeaking();
   if (micHeld) {
@@ -183,21 +256,43 @@ function closeConversation() {
   }
   hud.showChat(false);
   hud.setChoices([]);
+  hud.setTyping(false);
+  hud.setWaiting(false);
+  hud.showEnd(false);
   hud.setTranscript('');
 }
 
-async function submitText(text) {
-  if (!session || session.busy || session.ended) return;
-  const token = playToken;
-  session.busy = true;
-  hud.addLog('You', text, 'you');
-  const turn = await engine.respond(text, session.context);
-  await playTurn(turn, token);
+function talkAgain() {
+  if (!session || !session.ended) return;
+  const { conversationId, mode, members } = session;
+  closeConversation();
+  openConversation(conversationId, mode, members);
 }
 
-hud.onChoice((text) => { submitText(text); });
-hud.onSend((text) => { submitText(text); });
+function submitText(text, source) {
+  const clean = String(text || '').trim();
+  if (!session || !clean || session.ended) return;
+  if (session.busy) {
+    pendingReply = { text: clean, source: source || 'text' };
+    hud.setWaiting(true);
+    return;
+  }
+  const token = playToken;
+  choiceList = [];
+  hud.setChoices([]);
+  hud.showEnd(false);
+  session.busy = true;
+  hud.setTyping(true);
+  hud.addLog('You', clean, 'you');
+  const turn = engine.respond(clean, session.context);
+  if (turn && typeof turn.then === 'function') turn.then((value) => applyTurn(value, token, source || 'text'));
+  else applyTurn(turn, token, source || 'text');
+}
+
+hud.onChoice((text) => { submitText(text, 'choice'); });
+hud.onSend((text) => { submitText(text, 'text'); });
 hud.onLeave(() => closeConversation());
+hud.onAgain(() => talkAgain());
 
 function holdMic() {
   if (!session || !speech.supported || micHeld) return;
@@ -208,7 +303,7 @@ function releaseMic() {
   if (!micHeld) return;
   micHeld = false;
   const text = speech.stop();
-  if (text) submitText(text);
+  if (text) submitText(text, 'voice');
 }
 hud.micBtn.addEventListener('pointerdown', (event) => {
   event.preventDefault();
@@ -223,7 +318,16 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => {
   if (event.code === 'Space') releaseMic();
-  if (event.code === 'Escape') closeConversation();
+  if (event.code === 'Escape' || event.key === 'Escape') {
+    if (hud.helpOpen()) {
+      hud.setHelp(false);
+      return;
+    }
+    closeConversation();
+  }
+  if (!keyboard.typing() && (event.key === '?' || event.key === 'h' || event.key === 'H' || event.code === 'KeyH')) {
+    hud.setHelp(!hud.helpOpen());
+  }
 });
 
 function nearestGroup(x, z) {
@@ -293,14 +397,24 @@ function loop() {
     const moveX = ix * cos + iz * sin;
     const moveZ = -ix * sin + iz * cos;
     const run = keyboard.heldAny('ShiftLeft', 'ShiftRight');
-    player.update(dt, { x: moveX, z: moveZ }, run);
+    const bodies = npcs.map((npc) => ({
+      x: npc.avatar.root.position.x,
+      z: npc.avatar.root.position.z,
+      r: 0.42,
+    }));
+    player.update(dt, { x: moveX, z: moveZ }, run, bodies);
   }
 
   const pos = player.avatar.root.position;
   const speakerNpc = session && session.speaker ? byName.get(session.speaker) : null;
+  const bodyOf = (npc) => ({ x: npc.avatar.root.position.x, z: npc.avatar.root.position.z, r: 0.42 });
   for (const npc of npcs) {
     const locked = session && session.members.includes(npc);
-    npc.update(dt, now, locked);
+    const others = [{ x: pos.x, z: pos.z, r: player.radius }];
+    for (const other of npcs) {
+      if (other !== npc) others.push(bodyOf(other));
+    }
+    npc.update(dt, now, locked, others);
     if (locked && session.mode === 'solo') npc.face(pos.x, pos.z);
     else if (locked && session.center) npc.face(session.center.x, session.center.z);
     if (locked) {
@@ -312,23 +426,56 @@ function loop() {
 
   const zone = zoneAt(pos.x, pos.z);
   hud.setZone(zone.name);
+  updateNameTag();
 
-  const focus = session && session.center ? session.center : pos;
-  const useDist = session ? Math.max(dist, 7.4) : dist;
-  const usePitch = session ? Math.max(pitch, 0.58) : pitch;
-  const cosP = Math.cos(usePitch);
-  camDesired.set(
-    focus.x + Math.sin(yaw) * useDist * cosP,
-    1.25 + Math.sin(usePitch) * useDist,
-    focus.z + Math.cos(yaw) * useDist * cosP,
-  );
+  if (session && session.mode === 'group' && session.center) {
+    const center = session.center;
+    player.avatar.root.rotation.y = Math.atan2(center.x - pos.x, center.z - pos.z);
+    let ax = pos.x - center.x;
+    let az = pos.z - center.z;
+    const alen = Math.hypot(ax, az) || 1;
+    ax /= alen;
+    az /= alen;
+    camDesired.set(pos.x + ax * 2.35, 2.25, pos.z + az * 2.35);
+    const speak = speakerNpc ? speakerNpc.avatar.root.position : center;
+    lookDesired.set(speak.x * 0.72 + center.x * 0.28, 0.42, speak.z * 0.72 + center.z * 0.28);
+  } else if (session && session.mode === 'solo' && session.members[0]) {
+    const npos = session.members[0].avatar.root.position;
+    player.avatar.root.rotation.y = Math.atan2(npos.x - pos.x, npos.z - pos.z);
+    let dx = npos.x - pos.x;
+    let dz = npos.z - pos.z;
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len;
+    dz /= len;
+    let sx = -dz;
+    let sz = dx;
+    if (session.sideSign == null) {
+      const prefer = Math.sin(yaw) * sx + Math.cos(yaw) * sz;
+      session.sideSign = prefer < 0 ? -1 : 1;
+    }
+    sx *= session.sideSign;
+    sz *= session.sideSign;
+    camDesired.set(pos.x - dx * 0.85 + sx * 2.7, 2.05, pos.z - dz * 0.85 + sz * 2.7);
+    lookDesired.set((pos.x + npos.x) * 0.5, 0.38, (pos.z + npos.z) * 0.5);
+  } else {
+    const cosP = Math.cos(pitch);
+    camDesired.set(
+      pos.x + Math.sin(yaw) * dist * cosP,
+      1.25 + Math.sin(pitch) * dist,
+      pos.z + Math.cos(yaw) * dist * cosP,
+    );
+    lookDesired.set(pos.x, 1.25, pos.z);
+  }
   if (!camera.userData.ready) {
     camera.position.copy(camDesired);
+    lookSmoothed.copy(lookDesired);
     camera.userData.ready = true;
   } else {
-    camera.position.lerp(camDesired, 1 - Math.exp(-7 * dt));
+    const k = 1 - Math.exp(-7 * dt);
+    camera.position.lerp(camDesired, k);
+    lookSmoothed.lerp(lookDesired, 1 - Math.exp(-4 * dt));
   }
-  camera.lookAt(focus.x, 1.35, focus.z);
+  camera.lookAt(lookSmoothed);
   for (const npc of npcs) fitBubble(npc);
 
   if (!session) {
@@ -362,6 +509,25 @@ function loop() {
 
   drawMinimap(pos);
   renderer.render(scene, camera);
+}
+
+function updateNameTag() {
+  const tag = player.avatar.tag;
+  if (!tag) return;
+  if (session) {
+    tag.visible = false;
+    return;
+  }
+  tag.visible = true;
+  let near = false;
+  const p = player.avatar.root.position;
+  for (const npc of npcs) {
+    if (npc.distanceTo(p.x, p.z) < 1.7) near = true;
+  }
+  tag.position.y = near ? 2.62 : 2.15;
+  const s = near ? 1.05 : 1.7;
+  tag.scale.set(s, s * 0.25, 1);
+  tag.material.opacity = near ? 0.45 : 1;
 }
 
 function fitBubble(npc) {
@@ -484,12 +650,21 @@ window.__sim = {
   teleportTo,
   join: tryJoin,
   chat: tryChat,
-  say(text) { submitText(String(text || '')); },
+  say(text) { submitText(String(text || ''), 'text'); },
   choose(index) {
     const choice = choiceList[index];
-    if (choice) submitText(choice.text);
+    if (choice) submitText(choice.text, 'choice');
   },
   leave: closeConversation,
+  chatWith(name) {
+    const key = String(name || '').trim().toLowerCase();
+    const npc = npcs.find((item) => item.def.name.toLowerCase() === key || item.def.id === key);
+    if (!npc) return;
+    if (session) closeConversation();
+    const p = npc.avatar.root.position;
+    player.avatar.root.position.set(p.x + 1.25, 0, p.z + 0.15);
+    if (npc.def.solo) openConversation(npc.def.solo, 'solo', [npc]);
+  },
 };
 
 const clock = new THREE.Clock();

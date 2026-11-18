@@ -20,15 +20,26 @@
     <header id="top">
       <div id="zone-name">Plaza</div>
       <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
+      <div id="stats">Practice stats: 0 conversations · 0 voice matches</div>
       <label id="tts-label"><input type="checkbox" id="tts" /> Read lines aloud</label>
+      <button type="button" id="help-btn" title="Controls">?</button>
     </header>
     <canvas id="minimap" width="160" height="160" aria-label="Minimap"></canvas>
     <div id="ambient" class="hidden"></div>
     <div id="prompt" class="hidden"></div>
     <section id="chat" class="hidden">
       <div id="chat-log"></div>
+      <div id="typing" class="hidden" aria-hidden="true">…</div>
       <div id="transcript" class="hidden"></div>
+      <p id="wait-hint" class="hidden">Wait for them to finish...</p>
       <div id="choices"></div>
+      <div id="end-box" class="hidden">
+        <p>End of conversation</p>
+        <div id="end-actions">
+          <button type="button" id="leave-end">Leave</button>
+          <button type="button" id="talk-again">Talk again</button>
+        </div>
+      </div>
       <form id="say-form">
         <input id="say" type="text" maxlength="160" placeholder="Type a reply, or hold Space / the mic button" autocomplete="off" />
         <button type="submit">Send</button>
@@ -42,6 +53,23 @@
     <div id="touch-actions">
       <button type="button" id="btn-join" class="hidden">Join</button>
       <button type="button" id="btn-talk" class="hidden">Talk</button>
+    </div>
+  </div>
+  <div id="help" class="hidden">
+    <div id="help-card">
+      <h2>Controls (操作)</h2>
+      <ul>
+        <li>Walk with WASD or arrow keys (WASD 或方向键移动). Hold Shift to run (按住 Shift 跑步).</li>
+        <li>Drag to look around (拖动旋转镜头). Scroll to zoom (滚轮缩放).</li>
+        <li>On a phone, use the joystick (手机用左下摇杆移动).</li>
+        <li>Press E or Join near a group (靠近人群按 E 或 Join 加入).</li>
+        <li>Press F or Talk for a 1-on-1 chat (按 F 或 Talk 一对一聊天).</li>
+        <li>Reply with a choice, the text box, or hold Space / the mic button (点选项、打字，或按住空格/麦克风说话).</li>
+        <li>Press 1 wave, 2 nod, 3 jump (1 挥手, 2 点头, 3 跳跃).</li>
+        <li>Press Esc or Leave to step away (Esc 或 Leave 离开对话).</li>
+        <li>Press H or ? to open this list again (按 H 或 ? 再次打开说明).</li>
+      </ul>
+      <button type="button" id="help-close">Got it (知道了)</button>
     </div>
   </div>
   <script type="module" src="src/main.js"></script>
