@@ -28,6 +28,14 @@ export const CHARACTERS = [
   { id: 'ren', name: 'Audience Ren', kind: 'npc', color: 0x5c6bc0, accent: 0xffe0bd, zone: 'playhouse', group: null, solo: null, home: [-7.2, 39.15], angle: 0, voice: 2, look: { hair: 'short', hairColor: 0x3e2723, outfit: 'jacket' } },
   { id: 'sol', name: 'Audience Sol', kind: 'player', color: 0xec407a, accent: 0xffe0bd, zone: 'playhouse', group: null, solo: null, home: [7.2, 39.15], angle: 0, voice: 1, look: { hair: 'bob', hairColor: 0x4e342e, outfit: 'shirt' } },
 
+  { id: 'rio', name: 'Agent Rio', kind: 'npc', color: 0x1565c0, accent: 0xffe0bd, zone: 'airport', group: 'airport', solo: null, angle: 0.2, voice: 0, look: { hair: 'short', hairColor: 0x212121, outfit: 'jacket', hat: true, hatColor: 0x0d47a1 } },
+  { id: 'cam', name: 'Player: Guest_Cam', kind: 'player', color: 0x26a69a, accent: 0xffe0bd, zone: 'airport', group: 'airport', solo: null, angle: 2.4, voice: 2, look: { hair: 'bob', hairColor: 0x5d4037, outfit: 'jacket' } },
+  { id: 'dee', name: 'Player: Guest_Dee', kind: 'player', color: 0x8e24aa, accent: 0xf0c8a0, zone: 'airport', group: 'airport', solo: null, angle: 4.1, voice: 4, look: { hair: 'short', hairColor: 0x3e2723, outfit: 'shirt' } },
+
+  { id: 'noor', name: 'Pharmacist Noor', kind: 'npc', color: 0x00897b, accent: 0xffe0bd, zone: 'pharmacy', group: 'pharmacy', solo: null, angle: 0.15, voice: 1, look: { hair: 'bun', hairColor: 0x3e2723, outfit: 'jacket', glasses: true } },
+  { id: 'jun', name: 'Player: Guest_Jun', kind: 'player', color: 0xec407a, accent: 0xffe0bd, zone: 'pharmacy', group: 'pharmacy', solo: null, angle: 2.5, voice: 3, look: { hair: 'bob', hairColor: 0x4e342e, outfit: 'shirt' } },
+  { id: 'kim', name: 'Player: Guest_Kim', kind: 'player', color: 0x5c6bc0, accent: 0xffe0bd, zone: 'pharmacy', group: 'pharmacy', solo: null, angle: 4.2, voice: 5, look: { hair: 'short', hairColor: 0x212121, outfit: 'jacket' } },
+
   { id: 'rae', name: 'Player: Rae_guides', kind: 'player', color: 0x00838f, accent: 0xffe0bd, zone: 'plaza', group: null, solo: 'rae.solo', wander: true, home: [0, 0], roam: 6, voice: 2, look: { hair: 'short', hairColor: 0x3e2723, outfit: 'jacket' } },
   { id: 'eli', name: 'Student Eli', kind: 'npc', color: 0x8e24aa, accent: 0xffe0bd, zone: 'classroom', group: null, solo: 'eli.solo', wander: true, home: [-18, 6], roam: 3.2, voice: 3, look: { hair: 'spiky', hairColor: 0x4e342e, outfit: 'shirt' } },
 ];

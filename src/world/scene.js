@@ -133,6 +133,18 @@ export function createScene() {
     const door = rehearsal.portal || { x: -34, z: 0 };
     addIslandSign(scene, 'Rehearsal', '排练室', '#00897b', door.x, door.z + 2.6);
   }
+  const airport = ZONES.find((zone) => zone.id === 'airport');
+  if (airport) {
+    makeCounter(props, -46.6, -38, 4.2, Math.PI / 2, colliders, 0x3949ab);
+    const door = airport.portal || { x: -34, z: -33 };
+    addIslandSign(scene, 'Airport', '机场', '#3949ab', door.x - 2.4, door.z);
+  }
+  const pharmacy = ZONES.find((zone) => zone.id === 'pharmacy');
+  if (pharmacy) {
+    makeCounter(props, 46.4, 38, 4.2, Math.PI / 2, colliders, 0x00695c);
+    const door = pharmacy.portal || { x: 34, z: 32 };
+    addIslandSign(scene, 'Pharmacy', '药店', '#00695c', door.x, door.z + 2.2);
+  }
   const portalRings = [];
   for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));
 

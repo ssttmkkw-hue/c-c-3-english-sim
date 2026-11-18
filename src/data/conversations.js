@@ -229,6 +229,46 @@ export const AMBIENT = {
       ],
     },
   ],
+  'airport.ambient': [
+    {
+      id: 'gate',
+      lines: [
+        ambientLine('gate-ask', 'Player: Guest_Cam', 'Which way is our gate?', {
+          to: 'Agent Rio',
+          zh: '我们的登机口往哪边？',
+        }),
+        ambientLine('gate-left', 'Agent Rio', 'Down the hall, then left. You have time.', {
+          to: 'Player: Guest_Cam',
+          zh: '沿着走廊走，然后左转。时间还够。',
+          quick: true,
+        }),
+        ambientLine('gate-ok', 'Player: Guest_Dee', 'Left is easy. We can walk slowly.', {
+          to: 'Player: Guest_Cam',
+          zh: '左转很简单。我们可以慢慢走。',
+        }),
+      ],
+    },
+  ],
+  'pharmacy.ambient': [
+    {
+      id: 'hours',
+      lines: [
+        ambientLine('hours-ask', 'Player: Guest_Jun', 'What time do you close today?', {
+          to: 'Pharmacist Noor',
+          zh: '你们今天几点关门？',
+        }),
+        ambientLine('hours-six', 'Pharmacist Noor', 'We close at six. You have plenty of time.', {
+          to: 'Player: Guest_Jun',
+          zh: '我们六点关门。时间还很多。',
+          quick: true,
+        }),
+        ambientLine('hours-ok', 'Player: Guest_Kim', 'Six is fine. We can look slowly.', {
+          to: 'Pharmacist Noor',
+          zh: '六点可以。我们可以慢慢看。',
+        }),
+      ],
+    },
+  ],
   'hotel.ambient': [
     {
       id: 'checkout',

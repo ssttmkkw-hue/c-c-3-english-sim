@@ -1,9 +1,12 @@
 import { LATTE_SKIT } from './latte.js';
 import { LATE_CLASS_SKIT } from './late-class.js';
 import { CHECKIN_SKIT } from './check-in.js';
+import { AIRPORT_SKIT } from './airport.js';
+import { PHARMACY_SKIT } from './pharmacy.js';
+import { RESTAURANT_SKIT } from './restaurant.js';
 import { groupIdForZone, skitSpots } from '../../world/zones.js';
 
-export const SKITS = [LATTE_SKIT, LATE_CLASS_SKIT, CHECKIN_SKIT];
+export const SKITS = [LATTE_SKIT, LATE_CLASS_SKIT, CHECKIN_SKIT, AIRPORT_SKIT, PHARMACY_SKIT, RESTAURANT_SKIT];
 
 export function skitById(id) {
   const key = String(id || '').trim();
