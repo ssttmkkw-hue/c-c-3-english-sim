@@ -3,7 +3,7 @@ import { ZONES, WORLD_LIMIT, portals, skitSpots } from './zones.js';
 import {
   makeBench, makeChair, makeClock, makeClothesRack, makeCoffeeMachine, makeCounter,
   makeCup, makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard,
-  makePlant, makePortal, makePriceSign, makeShelf, makeSkitSpot, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
+  makePlant, makePortal, makePriceSign, makeShelf, makeShowBoard, makeSkitSpot, makeStage, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
 } from './props.js';
 
 export function createScene() {
@@ -101,6 +101,16 @@ export function createScene() {
   makePriceSign(props, 15.2, 8.4, 'Hat', '$12', -0.6, colliders);
 
   for (const spot of skitSpots()) makeSkitSpot(props, spot.x, spot.z);
+
+  let showBoard = null;
+  const playhouse = ZONES.find((zone) => zone.id === 'playhouse');
+  if (playhouse && playhouse.stage) {
+    makeStage(props, playhouse.stage.x, playhouse.stage.z, colliders);
+    for (const seat of playhouse.seats || []) makeChair(props, seat.x, seat.z, Math.PI);
+    if (playhouse.board) showBoard = makeShowBoard(props, playhouse.board.x, playhouse.board.z);
+    const door = playhouse.portal || { x: 0, z: 30 };
+    addPlayhouseSign(scene, door.x + 3.2, door.z + 0.4);
+  }
   const portalRings = [];
   for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));
 
@@ -123,7 +133,43 @@ export function createScene() {
 
   addZoneSigns(scene);
 
-  return { scene, colliders, portalRings, sun };
+  return { scene, colliders, portalRings, sun, showBoard };
+}
+
+function addPlayhouseSign(scene, x, z) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(16,32,39,0.9)';
+  roundSign(ctx, 16, 28, 480, 180, 28);
+  ctx.fill();
+  ctx.fillStyle = '#7e57c2';
+  ctx.fillRect(16, 28, 18, 180);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 64px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Playhouse', 270, 100);
+  ctx.fillStyle = '#ffe082';
+  ctx.font = '32px sans-serif';
+  ctx.fillText('Sit and watch', 270, 162);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const board = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 1.2),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+  );
+  board.position.set(x, 2.35, z);
+  board.lookAt(x, 2.35, z + 4);
+  scene.add(board);
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x546e7a, roughness: 0.8 })
+  );
+  post.position.set(x, 1.1, z);
+  post.castShadow = true;
+  scene.add(post);
 }
 
 function addZoneSigns(scene) {

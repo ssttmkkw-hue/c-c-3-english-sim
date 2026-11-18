@@ -196,6 +196,12 @@ export function createSkitPlayer(opts) {
   async function playBeats(token, beats) {
     if (!beats.length) return token === run;
     const lines = beats.map((beat, index) => toLine(skit, beat, beats[index + 1]));
+    if (fromTheater && phase === 'watch') {
+      lines.forEach((line, index) => {
+        const who = index % 2 === 0 ? 'Audience Ren' : 'Audience Sol';
+        line.back = [{ who, text: 'Ha!', at: 0.7 }];
+      });
+    }
     await opts.playLines(lines);
     return token === run && phase !== 'idle';
   }
@@ -371,7 +377,7 @@ export function createSkitPlayer(opts) {
     if (opts.yourTurn) opts.yourTurn(false);
     if (opts.calmPatience) opts.calmPatience();
     if (opts.savePhrases) opts.savePhrases(skit);
-    if (opts.applause) opts.applause(feedback);
+    if (opts.applause) opts.applause(feedback, { theater: fromTheater });
     publish();
   }
 

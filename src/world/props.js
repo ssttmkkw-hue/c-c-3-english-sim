@@ -397,6 +397,75 @@ export function makePortal(group, x, z) {
   return g;
 }
 
+/** Stage platform, curtains, lectern, and two lights. Cast stand on the marks. */
+export function makeStage(group, x, z, colliders) {
+  const g = new THREE.Group();
+  add(g, new THREE.BoxGeometry(10.5, 0.28, 4.2), mat(0x4e342e), 0, 0.14, 0);
+  add(g, new THREE.BoxGeometry(0.35, 3.1, 0.45), mat(0xb71c1c), -5.1, 1.7, 0.2);
+  add(g, new THREE.BoxGeometry(0.35, 3.1, 0.45), mat(0xb71c1c), 5.1, 1.7, 0.2);
+  add(g, new THREE.BoxGeometry(10.6, 0.45, 0.35), mat(0xc62828), 0, 3.15, 0.15);
+  add(g, new THREE.BoxGeometry(0.7, 1.05, 0.5), mat(0x5d4037), 2.4, 0.8, 0.7);
+  add(g, new THREE.BoxGeometry(0.9, 0.08, 0.55), mat(0xd7ccc8), 2.4, 1.35, 0.7);
+  const bulb = mat(0xfff59d, { emissive: 0xffee58, emissiveIntensity: 0.7 });
+  add(g, new THREE.SphereGeometry(0.16, 10, 8), bulb, -2.4, 3.35, 1.3);
+  add(g, new THREE.SphereGeometry(0.16, 10, 8), bulb, 2.4, 3.35, 1.3);
+  add(g, new THREE.CylinderGeometry(0.05, 0.05, 0.9, 6), mat(0x455a64), -2.4, 2.85, 1.3);
+  add(g, new THREE.CylinderGeometry(0.05, 0.05, 0.9, 6), mat(0x455a64), 2.4, 2.85, 1.3);
+  g.position.set(x, 0, z);
+  group.add(g);
+  if (colliders) {
+    colliders.push({ x: x - 5.1, z, r: 0.4 });
+    colliders.push({ x: x + 5.1, z, r: 0.4 });
+    colliders.push({ x: x + 2.4, z: z + 0.7, r: 0.45 });
+  }
+  return g;
+}
+
+/** Door board. Call set() whenever the show changes. */
+export function makeShowBoard(group, x, z) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const board = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 1.5),
+    new THREE.MeshBasicMaterial({ map: tex })
+  );
+  board.position.set(x, 2.15, z);
+  group.add(board);
+  const back = board.clone();
+  back.position.z = z - 0.04;
+  back.rotation.y = Math.PI;
+  group.add(back);
+  add(group, new THREE.CylinderGeometry(0.06, 0.06, 2.1, 8), mat(0x37474f), x, 1.05, z);
+  function fit(text, size, y, color) {
+    ctx.fillStyle = color;
+    let font = size;
+    ctx.font = `bold ${font}px sans-serif`;
+    const wide = ctx.measureText(text).width;
+    if (wide > 470) font = Math.max(22, Math.floor(size * 470 / wide));
+    ctx.font = `bold ${font}px sans-serif`;
+    ctx.fillText(text, 256, y);
+  }
+  return {
+    set(lines) {
+      ctx.fillStyle = '#1a237e';
+      ctx.fillRect(0, 0, 512, 320);
+      ctx.fillStyle = '#ffe082';
+      ctx.fillRect(0, 0, 512, 14);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      fit(lines[0] || '', 34, 58, '#ffe082');
+      fit(lines[1] || '', 40, 128, '#ffffff');
+      fit(lines[2] || '', 30, 200, '#b2ebf2');
+      fit(lines[3] || '', 34, 262, '#ffffff');
+      tex.needsUpdate = true;
+    },
+  };
+}
+
 /** A small stage spot with a readable "Skit" sign. No collider, so you can stand on it. */
 export function makeSkitSpot(group, x, z) {
   const g = new THREE.Group();

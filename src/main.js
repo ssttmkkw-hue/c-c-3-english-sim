@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createScene } from './world/scene.js';
 import { createAmbience } from './world/ambience.js';
 import { zoneAt, ZONES, zoneById as findZone, groupZoneMap, skitSpots, zoneList } from './world/zones.js';
+import { showAt, formatRemain } from './world/shows.js';
 import { CHARACTERS } from './data/characters.js';
 import { AMBIENT, GRAPHS, VISITOR_LINES } from './data/conversations.js';
 import { GROUP_CONVERSATIONS } from './data/catalog.js';
@@ -31,7 +32,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const { scene, colliders, portalRings, sun } = createScene();
+const { scene, colliders, portalRings, sun, showBoard } = createScene();
 const ambience = createAmbience(scene);
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 120);
 
@@ -146,6 +147,10 @@ skit = createSkitPlayer({
   zhOn: () => hud.getSettings().zh,
   render: (model) => hud.renderSkit(model),
   place(item) {
+    if (watchingShow) {
+      const p = player.avatar.root.position;
+      return fadeMove(p.x, p.z, () => stageCast(item));
+    }
     const spot = spotForSkit(item.id);
     if (!spot) return Promise.resolve();
     return fadeMove(spot.x, spot.z + 1.15);
@@ -167,6 +172,9 @@ skit = createSkitPlayer({
     stopSpeaking();
   },
   releaseFloor() {
+    restoreCast();
+    watchingShow = false;
+    seated = null;
     if (skitGroup) skitGroup.director.releaseFloor();
     skitGroup = null;
     stopSpeaking();
@@ -222,8 +230,92 @@ skit = createSkitPlayer({
       notebook.add({ text, zh, source, conversationId: item.id });
     }
   },
-  applause(text) { hud.celebrate(text); },
+  applause(text, extra) {
+    hud.celebrate(extra && extra.theater ? 'Applause!' : text);
+    if (extra && extra.theater) applaudAudience();
+  },
 });
+
+let watchingShow = false;
+let seated = null;
+let staged = [];
+
+function stageCast(item) {
+  restoreCast();
+  const zone = findZone('playhouse');
+  const marks = (zone && zone.stage && zone.stage.marks) || [];
+  if (!item || !marks.length) return;
+  (item.cast || []).forEach((member, index) => {
+    const npc = byName.get(member.npc);
+    if (!npc) return;
+    const p = npc.avatar.root.position;
+    staged.push({ npc, x: p.x, y: p.y, z: p.z, rot: npc.avatar.root.rotation.y });
+    const mark = marks[index % marks.length];
+    npc.avatar.root.position.set(mark.x, 0.28, mark.z);
+    npc.clearGoal();
+    npc.face(mark.x, mark.z + 5);
+  });
+}
+
+function restoreCast() {
+  for (const item of staged) {
+    item.npc.avatar.root.position.set(item.x, item.y || 0, item.z);
+    item.npc.avatar.root.rotation.y = item.rot;
+    item.npc.clearGoal();
+  }
+  staged = [];
+}
+
+function nearestSeat(x, z) {
+  const zone = findZone('playhouse');
+  if (!zone || !zone.seats) return null;
+  let best = null;
+  let bestDist = 1.65;
+  for (const seat of zone.seats) {
+    const dist = Math.hypot(seat.x - x, seat.z - z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = seat;
+    }
+  }
+  return best;
+}
+
+function sitDown(seat) {
+  if (!seat || session || (skit && skit.active())) return false;
+  const show = showAt(now, SKITS);
+  if (!show) return false;
+  seated = seat;
+  watchingShow = true;
+  player.avatar.root.position.set(seat.x, 0, seat.z);
+  player.avatar.root.rotation.y = Math.PI;
+  return skit.start(show.current.id, { theater: true });
+}
+
+function applaudAudience() {
+  for (const name of ['Audience Ren', 'Audience Sol']) {
+    const npc = byName.get(name);
+    if (!npc) continue;
+    npc.react('jump');
+    npc.say('Ha!', now, 2.4, 'back');
+  }
+}
+
+let boardKey = '';
+function updateShowBoard() {
+  if (!showBoard) return;
+  const show = showAt(now, SKITS);
+  if (!show) return;
+  const label = `${show.current.id}|${formatRemain(show.nextIn)}|${show.next.id}`;
+  if (label === boardKey) return;
+  boardKey = label;
+  showBoard.set([
+    'Now showing',
+    show.current.title,
+    `Next at ${formatRemain(show.nextIn)}`,
+    show.next.title,
+  ]);
+}
 
 let yaw = 2.2;
 let pitch = 0.55;
@@ -990,7 +1082,7 @@ function loop() {
     if (keyboard.consume('Digit3')) player.react('jump');
   }
 
-  if (!session && !keyboard.typing()) {
+  if (!session && !seated && !keyboard.typing()) {
     let ix = 0;
     let iz = 0;
     if (!help) {
@@ -1036,6 +1128,14 @@ function loop() {
 
   const zone = zoneAt(pos.x, pos.z);
   hud.setZone(zone.name);
+  if (zone.island) {
+    scene.fog.near = 26;
+    scene.fog.far = 80;
+  } else {
+    scene.fog.near = 18;
+    scene.fog.far = 52;
+  }
+  updateShowBoard();
 
   if (session && session.mode === 'group' && session.center) {
     const center = session.center;
@@ -1146,7 +1246,9 @@ function loop() {
         }
       }
       const spot = nearestSkit(pos.x, pos.z);
+      const seat = nearestSeat(pos.x, pos.z);
       const lines = [];
+      if (seat) lines.push('Press E to sit and watch');
       if (group) lines.push('Press E to choose a conversation');
       if (spot) lines.push('Press G to watch a skit');
       if (solo) lines.push(`Press F to chat 1-on-1 with ${solo.def.name}`);
@@ -1159,7 +1261,8 @@ function loop() {
       if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
         hud.setAmbient(group.recent.slice(-2));
       } else hud.setAmbient([]);
-      if (!help && group && keyboard.consume('KeyE')) openChooser(group);
+      if (!help && seat && keyboard.consume('KeyE')) sitDown(seat);
+      else if (!help && group && keyboard.consume('KeyE')) openChooser(group);
       if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
       if (!help && spot && keyboard.consume('KeyG')) startSkit(spot.id);
       hud.joinBtn.onclick = () => { if (group) openChooser(group); };
@@ -1307,9 +1410,12 @@ function fitBubble(npc) {
 
 function drawMinimap(pos) {
   const S = 160;
-  const span = 48;
-  const toX = (x) => ((x + 24) / span) * S;
-  const toY = (z) => ((z + 24) / span) * S;
+  const far = Math.abs(pos.x) > 24 || Math.abs(pos.z) > 24;
+  const span = far ? 36 : 48;
+  const originX = far ? pos.x : 0;
+  const originZ = far ? pos.z : 0;
+  const toX = (x) => ((x - originX) / span + 0.5) * S;
+  const toY = (z) => ((z - originZ) / span + 0.5) * S;
   mapCtx.clearRect(0, 0, S, S);
   mapCtx.fillStyle = '#d7ccc8';
   mapCtx.fillRect(0, 0, S, S);
@@ -1588,6 +1694,24 @@ window.__sim = {
     }));
   },
   openTeleport: togglePortals,
+  show() {
+    const show = showAt(now, SKITS);
+    if (!show) return null;
+    return {
+      id: show.current.id,
+      title: show.current.title,
+      next: show.next.title,
+      nextId: show.next.id,
+      nextIn: show.nextIn,
+    };
+  },
+  sit(index) {
+    const zone = findZone('playhouse');
+    const seats = (zone && zone.seats) || [];
+    const seat = seats[Number(index) || 0] || seats[0];
+    if (!seat) return false;
+    return sitDown(seat);
+  },
   join: tryJoin,
   chat: tryChat,
   listConversations,

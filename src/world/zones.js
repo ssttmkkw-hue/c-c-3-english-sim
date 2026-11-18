@@ -66,6 +66,34 @@ export const ZONES = [
     portal: { x: 6.2, z: 6.2 },
     skitSpots: [],
   },
+  {
+    id: 'playhouse',
+    name: 'Playhouse',
+    minX: -18, maxX: 18, minZ: 28, maxZ: 54,
+    floor: 0x7e57c2,
+    anchor: [0, 33],
+    spawn: [0, 49],
+    groupId: null,
+    island: true,
+    neighbors: [],
+    portal: { x: 0, z: 30.4 },
+    skitSpots: [],
+    board: { x: -7.4, z: 30.8 },
+    stage: {
+      x: 0,
+      z: 33,
+      marks: [
+        { x: -1.6, z: 32.7 },
+        { x: 0.35, z: 33.3 },
+        { x: 1.9, z: 32.7 },
+      ],
+    },
+    seats: [
+      { x: -4.5, z: 40 }, { x: -1.5, z: 40 }, { x: 1.5, z: 40 }, { x: 4.5, z: 40 },
+      { x: -4.5, z: 42.3 }, { x: -1.5, z: 42.3 }, { x: 1.5, z: 42.3 }, { x: 4.5, z: 42.3 },
+      { x: -4.5, z: 44.6 }, { x: -1.5, z: 44.6 }, { x: 1.5, z: 44.6 }, { x: 4.5, z: 44.6 },
+    ],
+  },
 ];
 
 export function zoneById(id) {
