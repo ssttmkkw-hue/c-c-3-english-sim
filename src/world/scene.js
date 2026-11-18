@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { ZONES, WORLD_LIMIT, portals, skitSpots } from './zones.js';
 import {
   makeBench, makeChair, makeClock, makeClothesRack, makeCoffeeMachine, makeCounter,
-  makeCup, makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard,
-  makePlant, makePortal, makePriceSign, makeShelf, makeShowBoard, makeSkitSpot, makeStage, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
+  makeCup,   makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard, makeMirror,
+  makePlant, makePortal, makePriceSign, makeRehearsalDesk, makeShelf, makeShowBoard, makeSkitSpot, makeStage, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
 } from './props.js';
 
 export function createScene() {
@@ -125,6 +125,13 @@ export function createScene() {
     bell.castShadow = true;
     props.add(bell);
     addIslandSign(scene, 'Hotel', 'Check in', '#1565c0', 33.6, 3.4);
+  }
+  const rehearsal = ZONES.find((zone) => zone.id === 'rehearsal');
+  if (rehearsal) {
+    makeRehearsalDesk(props, -44.2, 1.5, 0, colliders);
+    makeMirror(props, -47.5, 0, Math.PI / 2, colliders);
+    const door = rehearsal.portal || { x: -34, z: 0 };
+    addIslandSign(scene, 'Rehearsal', '排练室', '#00897b', door.x, door.z + 2.6);
   }
   const portalRings = [];
   for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));

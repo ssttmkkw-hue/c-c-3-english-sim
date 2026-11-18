@@ -496,6 +496,39 @@ export function makeSkitSpot(group, x, z) {
   return g;
 }
 
+const rehearsalWood = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.86, metalness: 0.02 });
+const rehearsalTop = new THREE.MeshStandardMaterial({ color: 0xeceff1, roughness: 0.7, metalness: 0.04 });
+const mirrorFrame = new THREE.MeshStandardMaterial({ color: 0x455a64, roughness: 0.42, metalness: 0.38 });
+const mirrorGlass = new THREE.MeshStandardMaterial({
+  color: 0xb3e5fc,
+  roughness: 0.06,
+  metalness: 0.72,
+  transparent: true,
+  opacity: 0.5,
+});
+
+/** A desk and a mirror for the private room. Materials are shared, not per visit. */
+export function makeRehearsalDesk(group, x, z, rotY, colliders) {
+  const g = new THREE.Group();
+  add(g, new THREE.BoxGeometry(1.8, 0.08, 0.72), rehearsalTop, 0, 0.78, 0);
+  add(g, new THREE.BoxGeometry(1.7, 0.68, 0.08), rehearsalWood, 0, 0.4, -0.28);
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY || 0;
+  group.add(g);
+  if (colliders) colliders.push({ x, z, r: 0.75 });
+}
+
+export function makeMirror(group, x, z, rotY, colliders) {
+  const g = new THREE.Group();
+  add(g, new THREE.BoxGeometry(1.55, 1.9, 0.08), mirrorFrame, 0, 1.35, 0);
+  const glass = add(g, new THREE.PlaneGeometry(1.28, 1.6), mirrorGlass, 0, 1.38, 0.05);
+  glass.castShadow = false;
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY || 0;
+  group.add(g);
+  if (colliders) colliders.push({ x, z, r: 0.4 });
+}
+
 export function makeFloor(scene, x, z, w, d, color) {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),

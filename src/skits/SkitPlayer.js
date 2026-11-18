@@ -112,6 +112,7 @@ export function createSkitPlayer(opts) {
   let rehearseIndex = 0;
   let heard = [];
   let fromTheater = false;
+  let privateRun = false;
   let floorReady = Promise.resolve();
 
   function pause(ms) {
@@ -167,6 +168,7 @@ export function createSkitPlayer(opts) {
       feedback,
       offerSkip,
       fromTheater,
+      private: privateRun,
       heard: heard.slice(),
       subtitle,
       lastLine,
@@ -194,8 +196,26 @@ export function createSkitPlayer(opts) {
     return run;
   }
 
+  async function narrateBeats(token, beats) {
+    for (const beat of beats) {
+      if (token !== run || phase === 'idle') return false;
+      beatId = beat.id;
+      lastLine = beat.text;
+      subtitle = { speaker: beat.role, text: beat.text, zh: beat.zh || '', role: beat.role };
+      publish();
+      if (opts.speak) {
+        try { opts.speak(beat.text, beat.role); } catch (err) { /* the words stay on screen */ }
+      }
+      const ms = Math.max(900, wordsOf(beat.text).length * 320);
+      await pause(ms);
+      if (token !== run || phase === 'idle') return false;
+    }
+    return true;
+  }
+
   async function playBeats(token, beats) {
     if (!beats.length) return token === run;
+    if (privateRun) return narrateBeats(token, beats);
     const lines = beats.map((beat, index) => toLine(skit, beat, beats[index + 1]));
     if (fromTheater && phase === 'watch') {
       lines.forEach((line, index) => {
@@ -212,7 +232,9 @@ export function createSkitPlayer(opts) {
     waiting = false;
     ended = false;
     offerSkip = false;
-    feedback = fromTheater ? 'Want to take a role?' : 'Pick a role, or watch again.';
+    feedback = privateRun
+      ? 'Just you. Take your time.'
+      : (fromTheater ? 'Want to take a role?' : 'Pick a role, or watch again.');
     publish();
   }
 
@@ -382,13 +404,15 @@ export function createSkitPlayer(opts) {
     ended = true;
     waiting = false;
     const total = playerBeats().length;
-    feedback = linesSaid > 0
-      ? `You said ${linesSaid} of ${total} lines!`
-      : 'You stayed for the whole scene. The lines are yours whenever you want them.';
+    feedback = privateRun
+      ? `${linesSaid} lines spoken`
+      : (linesSaid > 0
+        ? `You said ${linesSaid} of ${total} lines!`
+        : 'You stayed for the whole scene. The lines are yours whenever you want them.');
     if (opts.yourTurn) opts.yourTurn(false);
     if (opts.calmPatience) opts.calmPatience();
     if (opts.savePhrases) opts.savePhrases(skit);
-    if (opts.applause) opts.applause(feedback, { theater: fromTheater });
+    if (opts.applause && !privateRun) opts.applause(feedback, { theater: fromTheater });
     publish();
   }
 
@@ -406,6 +430,7 @@ export function createSkitPlayer(opts) {
     skipNow = false;
     offerSkip = false;
     fromTheater = false;
+    privateRun = false;
     if (slow && opts.setSlow) opts.setSlow(false);
     slow = false;
     if (opts.yourTurn) opts.yourTurn(false);
@@ -422,7 +447,8 @@ export function createSkitPlayer(opts) {
     if (!next) return false;
     if (phase !== 'idle') leave();
     skit = next;
-    fromTheater = !!(options && options.theater);
+    privateRun = !!(options && options.private);
+    fromTheater = !!(options && options.theater) && !privateRun;
     role = '';
     hintLevel = 0;
     linesSaid = 0;
@@ -443,7 +469,11 @@ export function createSkitPlayer(opts) {
     floorReady = (async () => {
       try {
         if (opts.place) await opts.place(skit);
-        if (phase === 'idle') return;
+        if (phase === 'idle' || token !== run) return;
+        if (privateRun) {
+          if (phase === 'watch') openRoles();
+          return;
+        }
         if (opts.claimFloor) await opts.claimFloor(skit);
         if (token !== run || phase !== 'watch') return;
         await runWatch(token);

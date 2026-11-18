@@ -271,13 +271,15 @@ export function createHUD() {
     if (!show) chooserList.innerHTML = '';
   }
 
-  function showChooser(items, note) {
+  function showChooser(items, note, title) {
     helpEl.classList.add('hidden');
     document.body.classList.remove('help-open');
     settingsEl.classList.add('hidden');
     notebookEl.classList.add('hidden');
     closePractice();
     setPortals(false);
+    const head = chooserEl.querySelector('h2');
+    if (head) head.textContent = title || 'Join a conversation (选择对话)';
     chooserNote.textContent = note || '';
     chooserList.innerHTML = '';
     let lastSection = '';
@@ -1108,7 +1110,9 @@ export function createHUD() {
     skitEl.classList.remove('hidden');
     document.body.classList.add('skit-open');
     skitTitleEl.textContent = model.titleZh && model.zh ? `${model.title} · ${model.titleZh}` : (model.title || '');
-    skitPhaseEl.textContent = PHASE_LABEL[model.phase] || '';
+    skitPhaseEl.textContent = model.private
+      ? 'Just you. Take your time. 只有你，慢慢来。'
+      : (PHASE_LABEL[model.phase] || '');
     const sub = model.subtitle;
     skitSpeakerEl.textContent = sub && sub.speaker ? sub.speaker : '';
     const showBlank = model.phase === 'perform' && model.hintLevel === 'blank' && model.waiting;

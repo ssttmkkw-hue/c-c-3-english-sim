@@ -153,6 +153,7 @@ skit = createSkitPlayer({
   zhOn: () => hud.getSettings().zh,
   render: (model) => hud.renderSkit(model),
   place(item) {
+    if (skit && skit.state().private) return Promise.resolve();
     if (watchingShow) {
       const p = player.avatar.root.position;
       return fadeMove(p.x, p.z, () => stageCast(item));
@@ -164,6 +165,7 @@ skit = createSkitPlayer({
   mute() { setAmbientMuted(true); },
   unmute() { if (!session) setAmbientMuted(false); },
   claimFloor(item) {
+    if (skit && skit.state().private) return Promise.resolve();
     const group = groups[groupIdForSkit(item)];
     skitGroup = group || null;
     if (!group) return Promise.resolve();
@@ -210,6 +212,7 @@ skit = createSkitPlayer({
     });
   },
   coverLine(beat) {
+    if (skit && skit.state().private) return;
     if (!skitGroup || !beat) return;
     const item = skitById(skit.state().id);
     const other = item && item.cast.find((member) => member.role !== beat.role && member.npc);
@@ -936,6 +939,7 @@ window.addEventListener('keyup', (event) => {
       return;
     }
     if (hud.chooserOpen()) {
+      practiceMenu = false;
       hud.setChooser(false);
       return;
     }
@@ -1349,16 +1353,18 @@ function loop() {
       }
       const spot = nearestSkit(pos.x, pos.z);
       const seat = nearestSeat(pos.x, pos.z);
+      const quietRoom = zone.id === 'rehearsal';
       const lines = [];
       if (seat) lines.push('Press E to sit and watch');
       if (group) lines.push('Press E to choose a conversation');
-      if (spot) lines.push('Press G to watch a skit');
+      if (quietRoom) lines.push('Press G to practice a skit');
+      else if (spot) lines.push('Press G to watch a skit');
       if (solo) lines.push(`Press F to chat 1-on-1 with ${solo.def.name}`);
       hud.setPrompt(lines);
       hud.setActions({
         join: group ? 'Choose conversation' : null,
         talk: solo ? 'Talk 1-on-1' : null,
-        skit: spot ? '🎭 Skit' : null,
+        skit: quietRoom ? 'Practice a skit' : (spot ? '🎭 Skit' : null),
       });
       if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
         hud.setAmbient(group.recent.slice(-2));
@@ -1366,10 +1372,14 @@ function loop() {
       if (!help && seat && keyboard.consume('KeyE')) sitDown(seat);
       else if (!help && group && keyboard.consume('KeyE')) openChooser(group);
       if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
-      if (!help && spot && keyboard.consume('KeyG')) startSkit(spot.id);
+      if (!help && quietRoom && keyboard.consume('KeyG')) openPracticeMenu();
+      else if (!help && spot && keyboard.consume('KeyG')) startSkit(spot.id);
       hud.joinBtn.onclick = () => { if (group) openChooser(group); };
       hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
-      hud.skitBtn.onclick = () => { if (spot) startSkit(spot.id); };
+      hud.skitBtn.onclick = () => {
+        if (quietRoom) openPracticeMenu();
+        else if (spot) startSkit(spot.id);
+      };
     }
   }
 
@@ -1596,8 +1606,35 @@ function startSkit(id) {
   return skit.start(id);
 }
 
+let practiceMenu = false;
+
+function openPracticeMenu() {
+  if (session || (skit && skit.active())) return;
+  practiceMenu = true;
+  const scenes = SKITS.map((item) => ({
+    id: item.id,
+    title: item.titleZh ? `${item.title} · ${item.titleZh}` : item.title,
+    level: item.level,
+    kind: 'skit',
+    section: 'Practice a skit (练习小剧场)',
+  }));
+  hud.showChooser(scenes, 'Just you. Take your time. 只有你，慢慢来。', 'Practice a skit (练习小剧场)');
+}
+
+function startPrivate(id, role) {
+  if (session) closeConversation();
+  practiceMenu = false;
+  hud.setChooser(false);
+  if (hud.practiceOpen()) hud.closePractice();
+  const started = skit.start(id, { private: true });
+  if (!started) return false;
+  if (role) skit.rehearse(role);
+  return true;
+}
+
 function openChooser(group) {
   if (!group || session || (skit && skit.active())) return;
+  practiceMenu = false;
   const talks = orderedTalks(group.zone.id).map((item) => ({ ...item, section: 'Conversations (对话)' }));
   const scenes = skitsInZone(group.zone.id).map((item) => ({
     id: item.id,
@@ -1616,6 +1653,11 @@ document.querySelector('#portals-btn').addEventListener('click', () => togglePor
 document.querySelector('#btn-portals').addEventListener('click', () => togglePortals());
 
 hud.onPick((id) => {
+  if (practiceMenu) {
+    practiceMenu = false;
+    if (skitById(id)) startPrivate(id);
+    return;
+  }
   if (skitById(id)) startSkit(id);
   else joinConversation(id, true);
 });
@@ -1924,7 +1966,10 @@ window.__sim = {
   skipLine: () => skit.skipLine(),
   castCheck: () => missingCast(new Set(byName.keys())),
   pickRole: (role) => skit.pickRole(role),
-  rehearse: (role) => skit.rehearse(role),
+  rehearse(skitId, role) {
+    if (skitById(skitId)) return startPrivate(skitId, role);
+    return skit.rehearse(skitId);
+  },
   skitSay: (text) => skit.skitSay(text, 'text'),
   skitState() {
     const state = skit.state();
@@ -1935,6 +1980,7 @@ window.__sim = {
       hintLevel: state.hintLevel,
       linesSaid: state.linesSaid,
       ended: state.ended,
+      private: !!state.private,
       waiting: state.waiting,
       offerSkip: state.offerSkip,
       feedback: state.feedback,

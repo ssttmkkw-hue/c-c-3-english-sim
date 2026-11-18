@@ -617,9 +617,9 @@ body.skit-open #touch { display: none !important; }
   padding: 12px 14px 10px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
-#skit-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+#skit-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 #skit-title { font-size: 16px; }
-#skit-phase { color: #ffe082; font-size: 13px; }
+#skit-phase { color: #ffe082; font-size: 13px; line-height: 1.35; text-align: right; }
 #skit-speaker { margin: 6px 0 0; color: #b3e5fc; font-size: 13px; }
 #skit-line { margin: 2px 0 0; font-size: 18px; font-weight: 650; line-height: 1.35; }
 #skit-zh { margin: 2px 0 0; color: #ffe082; }

@@ -116,6 +116,20 @@ export const ZONES = [
     portal: { x: 32.2, z: 0 },
     skitSpots: [{ id: 'check-in-desk', x: 36.6, z: -4.2 }],
   },
+  {
+    id: 'rehearsal',
+    name: 'Rehearsal',
+    minX: -50, maxX: -32, minZ: -9, maxZ: 9,
+    floor: 0x4db6ac,
+    anchor: [-41, 0],
+    spawn: [-36.2, 0.4],
+    lookAt: [-46.5, 0],
+    groupId: null,
+    island: true,
+    neighbors: [],
+    portal: { x: -34.2, z: 0 },
+    skitSpots: [],
+  },
 ];
 
 export function zoneById(id) {
