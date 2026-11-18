@@ -59,32 +59,67 @@ export function createAvatar({ name, kind, color, accent }) {
 }
 
 export function animateAvatar(avatar, dt, moving, speed, state) {
-  state.phase = (state.phase || 0) + dt * (moving ? 8 + speed : 2);
+  state.phase = (state.phase || 0) + dt * (moving ? 8 + speed : 1.6);
   const swing = moving ? Math.sin(state.phase) : 0;
-  avatar.legL.rotation.x = swing * 0.7;
-  avatar.legR.rotation.x = -swing * 0.7;
-  avatar.armL.rotation.x = -swing * 0.5;
-  avatar.armR.rotation.x = swing * 0.5;
-  avatar.body.position.y = moving ? Math.abs(Math.sin(state.phase)) * 0.06 : Math.sin(state.phase) * 0.015;
+  const breathe = Math.sin(state.phase * (moving ? 1 : 1.35)) * (moving ? 0.02 : 0.018);
+  avatar.legL.rotation.x = swing * 0.75;
+  avatar.legR.rotation.x = -swing * 0.75;
+  avatar.body.position.y = (moving ? Math.abs(Math.sin(state.phase)) * 0.07 : 0) + breathe;
+
+  const waving = state.react === 'wave';
+  if (!waving) {
+    avatar.armL.rotation.x = -swing * 0.55;
+    avatar.armR.rotation.x = swing * 0.55;
+    avatar.armL.rotation.z += (0 - avatar.armL.rotation.z) * 0.2;
+    avatar.armR.rotation.z += (0 - avatar.armR.rotation.z) * 0.2;
+  } else {
+    avatar.armL.rotation.x = -swing * 0.2;
+  }
 
   if (state.react === 'nod') {
     state.reactT -= dt;
-    avatar.head.rotation.x = Math.sin(state.reactT * 14) * 0.35;
-    if (state.reactT <= 0) {
-      state.react = null;
-      avatar.head.rotation.x = 0;
-    }
+    avatar.head.rotation.x = Math.sin(state.reactT * 14) * 0.4;
+    if (state.reactT <= 0) state.react = null;
   } else if (state.react === 'jump') {
     state.reactT -= dt;
-    const k = Math.max(state.reactT, 0) / 0.45;
-    avatar.body.position.y += Math.sin((1 - k) * Math.PI) * 0.28;
+    const k = Math.max(state.reactT, 0) / 0.5;
+    avatar.body.position.y += Math.sin((1 - k) * Math.PI) * 0.35;
     if (state.reactT <= 0) state.react = null;
+  } else if (state.react === 'wave') {
+    state.reactT -= dt;
+    avatar.armR.rotation.x = -1.15;
+    avatar.armR.rotation.z = -0.35 + Math.sin(state.reactT * 18) * 0.55;
+    if (state.reactT <= 0) {
+      state.react = null;
+      avatar.armR.rotation.x = 0;
+      avatar.armR.rotation.z = 0;
+    }
   } else {
-    avatar.head.rotation.x *= 0.85;
+    avatar.head.rotation.x *= 0.86;
   }
 }
 
+/** Turn the head toward a world-space point. Body yaw stays on the root. */
+export function lookHeadAt(avatar, x, z, dt) {
+  const dx = x - avatar.root.position.x;
+  const dz = z - avatar.root.position.z;
+  let local = Math.atan2(dx, dz) - avatar.root.rotation.y;
+  while (local > Math.PI) local -= Math.PI * 2;
+  while (local < -Math.PI) local += Math.PI * 2;
+  local = Math.max(-1.05, Math.min(1.05, local));
+  const k = 1 - Math.exp(-8 * dt);
+  avatar.head.rotation.y += (local - avatar.head.rotation.y) * k;
+}
+
 export function triggerReact(state, kind) {
-  state.react = kind === 'jump' ? 'jump' : 'nod';
-  state.reactT = kind === 'jump' ? 0.45 : 0.7;
+  if (kind === 'jump') {
+    state.react = 'jump';
+    state.reactT = 0.5;
+  } else if (kind === 'wave') {
+    state.react = 'wave';
+    state.reactT = 0.9;
+  } else {
+    state.react = 'nod';
+    state.reactT = 0.7;
+  }
 }

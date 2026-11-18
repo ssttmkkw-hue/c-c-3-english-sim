@@ -2,6 +2,33 @@ const HELD_BLOCK = new Set([
   'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
 ]);
 
+/** Map KeyboardEvent.key when code is missing (some automated drivers). */
+const FROM_KEY = {
+  w: 'KeyW',
+  a: 'KeyA',
+  s: 'KeyS',
+  d: 'KeyD',
+  arrowup: 'ArrowUp',
+  arrowdown: 'ArrowDown',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight',
+  ' ': 'Space',
+  escape: 'Escape',
+  shift: 'ShiftLeft',
+  '1': 'Digit1',
+  '2': 'Digit2',
+  '3': 'Digit3',
+};
+
+export function eventCode(event) {
+  const key = String(event.key || '').toLowerCase();
+  const fromKey = FROM_KEY[key];
+  const code = event.code || '';
+  if (fromKey && (!code || code === 'Unidentified' || code === key || code.length === 1)) return fromKey;
+  if (code && code !== 'Unidentified') return code;
+  return fromKey || '';
+}
+
 export function createKeyboard() {
   const down = new Set();
   const pressed = new Set();
@@ -12,14 +39,16 @@ export function createKeyboard() {
   }
 
   window.addEventListener('keydown', (event) => {
-    if (!typingTarget(event) && HELD_BLOCK.has(event.code)) event.preventDefault();
+    const code = eventCode(event);
+    if (!code) return;
+    if (!typingTarget(event) && HELD_BLOCK.has(code)) event.preventDefault();
     if (event.repeat) return;
-    down.add(event.code);
-    pressed.add(event.code);
-  });
+    down.add(code);
+    pressed.add(code);
+  }, true);
   window.addEventListener('keyup', (event) => {
-    down.delete(event.code);
-  });
+    down.delete(eventCode(event));
+  }, true);
   window.addEventListener('blur', () => {
     down.clear();
   });

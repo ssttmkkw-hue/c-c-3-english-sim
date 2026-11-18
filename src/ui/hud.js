@@ -12,6 +12,9 @@ export function createHUD() {
   const joinBtn = document.querySelector('#btn-join');
   const talkBtn = document.querySelector('#btn-talk');
   const micBtn = document.querySelector('#mic-btn');
+  const transcriptEl = document.querySelector('#transcript');
+
+  const MIC_TITLE = 'Speech recognition needs Chrome or Edge, and the page must be on localhost or https. Firefox and insecure http pages do not expose the mic API.';
 
   let onChoice = () => {};
   let onSend = () => {};
@@ -55,13 +58,31 @@ export function createHUD() {
 
   function setMic(state) {
     micEl.dataset.state = state;
+    micBtn.dataset.state = state;
     const labels = {
       idle: 'Mic idle',
       listening: 'Mic listening',
       unsupported: 'Mic unsupported',
     };
+    const buttonLabels = {
+      idle: 'Hold to talk',
+      listening: 'Listening…',
+      unsupported: 'Mic unavailable',
+    };
     micEl.textContent = labels[state] || state;
+    micBtn.textContent = buttonLabels[state] || 'Hold to talk';
     micBtn.disabled = state === 'unsupported';
+    const tip = state === 'unsupported'
+      ? MIC_TITLE
+      : 'Hold to talk. Works in Chrome or Edge on localhost or https.';
+    micEl.title = tip;
+    micBtn.title = tip;
+  }
+
+  function setTranscript(text) {
+    const value = (text || '').trim();
+    transcriptEl.textContent = value ? value : '';
+    transcriptEl.classList.toggle('hidden', !value);
   }
 
   function showChat(show) {
@@ -69,13 +90,43 @@ export function createHUD() {
     if (show) logEl.innerHTML = '';
   }
 
+  function speakerColor(name) {
+    let h = 0;
+    const s = String(name || '');
+    for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) >>> 0;
+    return `hsl(${h % 360} 78% 76%)`;
+  }
+
   function addLog(speaker, text, kind) {
     const row = document.createElement('p');
     row.className = kind || 'npc';
     const who = document.createElement('strong');
     who.textContent = speaker;
+    who.style.color = kind === 'you' ? '#80d8ff' : speakerColor(speaker);
     row.appendChild(who);
     row.appendChild(document.createTextNode(` ${text}`));
+    logEl.appendChild(row);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function addHeard(text) {
+    const row = document.createElement('p');
+    row.className = 'heard';
+    row.textContent = `Heard: ${text}`;
+    logEl.appendChild(row);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function addRecap(phrases) {
+    if (!phrases || !phrases.length) return;
+    const row = document.createElement('p');
+    row.className = 'recap';
+    const who = document.createElement('strong');
+    who.textContent = 'Useful phrases';
+    row.appendChild(who);
+    const list = document.createElement('span');
+    list.textContent = ` ${phrases.join(' · ')}`;
+    row.appendChild(list);
     logEl.appendChild(row);
     logEl.scrollTop = logEl.scrollHeight;
   }
@@ -126,7 +177,10 @@ export function createHUD() {
     addLog,
     setChoices,
     setInterim,
+    setTranscript,
     setAmbient,
+    addHeard,
+    addRecap,
     ttsEnabled,
     sayEl,
     micBtn,

@@ -91,5 +91,61 @@ export function createScene() {
     scene.add(wall);
   });
 
+  addZoneSigns(scene);
+
   return { scene, colliders };
+}
+
+function addZoneSigns(scene) {
+  const spots = [
+    { text: 'Cafe', sub: 'Order and chat', x: -3.4, z: -10, color: '#6d4c41' },
+    { text: 'Park', sub: 'Walk and talk', x: 3.4, z: -10, color: '#2e7d32' },
+    { text: 'Classroom', sub: 'Practice English', x: -3.4, z: 10, color: '#5e35b1' },
+    { text: 'Shop', sub: 'Ask and buy', x: 3.4, z: 10, color: '#ef6c00' },
+  ];
+  for (const spot of spots) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(16,32,39,0.9)';
+    roundSign(ctx, 16, 28, 480, 180, 28);
+    ctx.fill();
+    ctx.fillStyle = spot.color;
+    ctx.fillRect(16, 28, 18, 180);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 72px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(spot.text, 270, 100);
+    ctx.fillStyle = '#ffe082';
+    ctx.font = '36px sans-serif';
+    ctx.fillText(spot.sub, 270, 162);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.2),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+    );
+    board.position.set(spot.x, 2.35, spot.z);
+    board.lookAt(0, 2.35, 0);
+    scene.add(board);
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x546e7a, roughness: 0.8 })
+    );
+    post.position.set(spot.x, 1.1, spot.z);
+    post.castShadow = true;
+    scene.add(post);
+  }
+}
+
+function roundSign(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }

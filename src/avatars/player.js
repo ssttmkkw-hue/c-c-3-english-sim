@@ -1,4 +1,4 @@
-import { animateAvatar, createAvatar } from './avatar.js';
+import { animateAvatar, createAvatar, triggerReact } from './avatar.js';
 import { blocked } from '../world/zones.js';
 
 export function createPlayer(colliders) {
@@ -9,11 +9,11 @@ export function createPlayer(colliders) {
     accent: 0xffe0bd,
   });
   avatar.root.position.set(0, 0, 0);
-  const anim = { phase: 0 };
+  const anim = { phase: 0, react: null, reactT: 0 };
   const radius = 0.45;
 
   function update(dt, move, run) {
-    const speed = run ? 5.4 : 2.5;
+    const speed = run ? 8.2 : 5.4;
     const len = Math.hypot(move.x, move.z);
     let moving = false;
     if (len > 0.001) {
@@ -32,5 +32,12 @@ export function createPlayer(colliders) {
     animateAvatar(avatar, dt, moving, speed, anim);
   }
 
-  return { avatar, update, radius };
+  return {
+    avatar,
+    update,
+    radius,
+    react(kind) {
+      triggerReact(anim, kind);
+    },
+  };
 }

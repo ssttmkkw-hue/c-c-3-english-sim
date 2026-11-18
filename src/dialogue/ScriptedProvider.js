@@ -15,6 +15,7 @@ function present(node, reaction) {
     })),
     ended,
     reaction: node.reaction || reaction || 'nod',
+    phrases: ended ? (node.phrases || []) : [],
   };
 }
 
@@ -74,7 +75,7 @@ export class ScriptedProvider extends ConversationProvider {
     if (!matched) return retryTurn(node);
     this.session.nodeId = matched.next;
     const next = graph.nodes[matched.next];
-    if (!next) return { npcLines: [], choices: [], ended: true, reaction: 'nod' };
-    return present(next, matched.reaction);
+    if (!next) return { npcLines: [], choices: [], ended: true, reaction: 'nod', heard: matched.text };
+    return { ...present(next, matched.reaction), heard: matched.text };
   }
 }

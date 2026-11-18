@@ -62,18 +62,26 @@ const speech = createSpeechInput();
 const hud = createHUD();
 const engine = new DialogueEngine(new ScriptedProvider(GRAPHS));
 
-let yaw = 0.4;
+let yaw = 2.2;
 let pitch = 0.55;
 let dist = 6.2;
 let now = 0;
 let session = null;
 let playToken = 0;
 let micHeld = false;
+let lastNpcLine = '';
+let choiceList = [];
+
+const camDesired = new THREE.Vector3();
+const bubbleAnchor = new THREE.Vector3();
+const mapCanvas = document.querySelector('#minimap');
+const mapCtx = mapCanvas.getContext('2d');
 
 hud.setMic(speech.supported ? 'idle' : 'unsupported');
 speech.setHandler((info) => {
   hud.setMic(speech.supported ? info.status : 'unsupported');
-  if (info.status === 'listening') hud.setInterim(`${info.finalText} ${info.interim}`.trim());
+  if (info.status === 'listening') hud.setTranscript(`${info.finalText} ${info.interim}`.trim());
+  else hud.setTranscript('');
 });
 
 function wait(ms) {
@@ -97,14 +105,35 @@ async function playTurn(turn, token) {
       npc.react(turn.reaction || 'nod');
     }
     hud.addLog(line.speaker, line.text, 'npc');
+    lastNpcLine = `${line.speaker}: ${line.text}`;
+    session.speaker = line.speaker;
     if (hud.ttsEnabled()) speakLine(line.text, voiceOf(line.speaker));
     await wait(Math.min(2800, 900 + line.text.length * 22));
   }
   if (token !== playToken) return;
-  hud.setChoices(turn.choices || []);
+  if (turn.heard) hud.addHeard(turn.heard);
+  choiceList = turn.choices || [];
+  hud.setChoices(choiceList);
   session.ended = !!turn.ended;
   session.busy = false;
-  if (turn.ended) hud.addLog('System', 'Press Esc or Leave when you want to step away.', 'you');
+  if (turn.ended) {
+    hud.addRecap(turn.phrases || []);
+    hud.addLog('System', 'Press Esc or Leave when you want to step away.', 'you');
+  }
+}
+
+function formCircle(members) {
+  const p = player.avatar.root.position;
+  const radius = Math.max(1.5, 0.9 + members.length * 0.22);
+  const cx = p.x;
+  const cz = p.z - radius;
+  session.center = new THREE.Vector3(cx, 1.25, cz);
+  const slots = members.length + 1;
+  members.forEach((npc, i) => {
+    const ang = (Math.PI * 2 * (i + 1)) / slots;
+    npc.setGoal(cx + Math.sin(ang) * radius, cz + Math.cos(ang) * radius, cx, cz);
+    npc.face(cx, cz);
+  });
 }
 
 async function openConversation(conversationId, mode, members) {
@@ -132,6 +161,7 @@ async function openConversation(conversationId, mode, members) {
   hud.setActions({ join: null, talk: null });
   hud.setAmbient([]);
   hud.showChat(true);
+  formCircle(members);
   const turn = await engine.start(session.context);
   await playTurn(turn, token);
 }
@@ -141,7 +171,10 @@ function closeConversation() {
   playToken += 1;
   for (const npc of session.members) {
     if (npc.def.group && groups[npc.def.group]) groups[npc.def.group].paused = false;
+    npc.clearGoal();
+    npc.clearLook();
   }
+  choiceList = [];
   session = null;
   stopSpeaking();
   if (micHeld) {
@@ -150,6 +183,7 @@ function closeConversation() {
   }
   hud.showChat(false);
   hud.setChoices([]);
+  hud.setTranscript('');
 }
 
 async function submitText(text) {
@@ -241,7 +275,13 @@ function loop() {
   pitch = Math.min(1.2, Math.max(0.25, pitch + look.dy * 0.003));
   dist = Math.min(9, Math.max(3.2, dist + look.wheel * 0.45));
 
-  if (!session) {
+  if (!keyboard.typing()) {
+    if (keyboard.consume('Digit1')) player.react('wave');
+    if (keyboard.consume('Digit2')) player.react('nod');
+    if (keyboard.consume('Digit3')) player.react('jump');
+  }
+
+  if (!session && !keyboard.typing()) {
     let ix = touch.vector.x;
     let iz = touch.vector.y;
     if (keyboard.heldAny('KeyA', 'ArrowLeft')) ix -= 1;
@@ -257,25 +297,39 @@ function loop() {
   }
 
   const pos = player.avatar.root.position;
+  const speakerNpc = session && session.speaker ? byName.get(session.speaker) : null;
   for (const npc of npcs) {
     const locked = session && session.members.includes(npc);
     npc.update(dt, now, locked);
-    if (locked) npc.face(pos.x, pos.z);
+    if (locked && session.mode === 'solo') npc.face(pos.x, pos.z);
+    else if (locked && session.center) npc.face(session.center.x, session.center.z);
+    if (locked) {
+      const target = speakerNpc && speakerNpc !== npc ? speakerNpc.avatar.root.position : pos;
+      npc.lookAt(target.x, target.z);
+    } else npc.clearLook();
   }
   updateAmbient(dt, pos.x, pos.z);
 
   const zone = zoneAt(pos.x, pos.z);
   hud.setZone(zone.name);
 
-  const head = pos.clone();
-  head.y = 1.45;
-  const cosP = Math.cos(pitch);
-  camera.position.set(
-    pos.x + Math.sin(yaw) * dist * cosP,
-    pos.y + 1.2 + Math.sin(pitch) * dist,
-    pos.z + Math.cos(yaw) * dist * cosP,
+  const focus = session && session.center ? session.center : pos;
+  const useDist = session ? Math.max(dist, 7.4) : dist;
+  const usePitch = session ? Math.max(pitch, 0.58) : pitch;
+  const cosP = Math.cos(usePitch);
+  camDesired.set(
+    focus.x + Math.sin(yaw) * useDist * cosP,
+    1.25 + Math.sin(usePitch) * useDist,
+    focus.z + Math.cos(yaw) * useDist * cosP,
   );
-  camera.lookAt(head);
+  if (!camera.userData.ready) {
+    camera.position.copy(camDesired);
+    camera.userData.ready = true;
+  } else {
+    camera.position.lerp(camDesired, 1 - Math.exp(-7 * dt));
+  }
+  camera.lookAt(focus.x, 1.35, focus.z);
+  for (const npc of npcs) fitBubble(npc);
 
   if (!session) {
     const group = nearestGroup(pos.x, pos.z);
@@ -297,8 +351,8 @@ function loop() {
       join: group ? 'Join conversation' : null,
       talk: solo ? 'Talk 1-on-1' : null,
     });
-    if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 8) {
-      hud.setAmbient(group.recent);
+    if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
+      hud.setAmbient(group.recent.slice(-2));
     } else hud.setAmbient([]);
     if (group && keyboard.consume('KeyE')) openConversation(group.zone.dialogue, 'group', group.members);
     if (solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
@@ -306,8 +360,137 @@ function loop() {
     hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
   }
 
+  drawMinimap(pos);
   renderer.render(scene, camera);
 }
+
+function fitBubble(npc) {
+  const spr = npc.avatar.bubble;
+  if (now >= npc.bubbleUntil()) {
+    spr.visible = false;
+    return;
+  }
+  npc.avatar.root.getWorldPosition(bubbleAnchor);
+  const away = bubbleAnchor.distanceTo(camera.position);
+  if (away > 15) {
+    spr.visible = false;
+    return;
+  }
+  spr.visible = true;
+  const s = Math.min(4.6, Math.max(1.85, away * 0.27));
+  spr.scale.set(s * 1.15, s * 0.43, 1);
+}
+
+function drawMinimap(pos) {
+  const S = 160;
+  const span = 48;
+  const toX = (x) => ((x + 24) / span) * S;
+  const toY = (z) => ((z + 24) / span) * S;
+  mapCtx.clearRect(0, 0, S, S);
+  mapCtx.fillStyle = '#d7ccc8';
+  mapCtx.fillRect(0, 0, S, S);
+  for (const zone of ZONES) {
+    mapCtx.fillStyle = `#${zone.floor.toString(16).padStart(6, '0')}`;
+    const x0 = toX(zone.minX);
+    const y0 = toY(zone.minZ);
+    mapCtx.fillRect(x0, y0, toX(zone.maxX) - x0, toY(zone.maxZ) - y0);
+  }
+  mapCtx.fillStyle = '#ffffff';
+  mapCtx.font = '10px sans-serif';
+  for (const zone of ZONES) {
+    mapCtx.fillText(zone.name.split(' ')[0], toX(zone.anchor[0]) - 14, toY(zone.anchor[1]));
+    mapCtx.beginPath();
+    mapCtx.arc(toX(zone.anchor[0]), toY(zone.anchor[1]), 3.5, 0, Math.PI * 2);
+    mapCtx.fill();
+  }
+  mapCtx.fillStyle = '#263238';
+  for (const npc of npcs) {
+    const p = npc.avatar.root.position;
+    mapCtx.fillRect(toX(p.x) - 1.5, toY(p.z) - 1.5, 3, 3);
+  }
+  mapCtx.fillStyle = '#0277bd';
+  mapCtx.beginPath();
+  mapCtx.arc(toX(pos.x), toY(pos.z), 4.5, 0, Math.PI * 2);
+  mapCtx.fill();
+}
+
+function nearestSolo() {
+  const pos = player.avatar.root.position;
+  let solo = null;
+  let soloDist = 2.55;
+  for (const npc of npcs) {
+    if (!npc.def.solo) continue;
+    const d = npc.distanceTo(pos.x, pos.z);
+    if (d < soloDist) {
+      soloDist = d;
+      solo = npc;
+    }
+  }
+  return solo;
+}
+
+function tryJoin() {
+  if (session) return;
+  const pos = player.avatar.root.position;
+  const group = nearestGroup(pos.x, pos.z);
+  if (group) openConversation(group.zone.dialogue, 'group', group.members);
+}
+
+function tryChat() {
+  if (session) return;
+  const solo = nearestSolo();
+  if (solo) openConversation(solo.def.solo, 'solo', [solo]);
+}
+
+function teleportTo(zoneOrGroupId) {
+  const key = String(zoneOrGroupId || '').trim().toLowerCase();
+  if (key === 'plaza' || key === 'center') {
+    player.avatar.root.position.set(0, 0, 0);
+    return;
+  }
+  const zoneKey = GROUP_ZONE[key] || (key === 'classroom' ? 'classroom' : key);
+  const zone = zoneById[zoneKey] || ZONES.find((item) => item.name.toLowerCase() === key);
+  if (zone && zone.anchor) {
+    player.avatar.root.position.set(zone.anchor[0], 0, zone.anchor[1] + 3.5);
+    return;
+  }
+  const npc = npcs.find((item) => item.def.id === key || item.def.name.toLowerCase() === key);
+  if (npc) {
+    const p = npc.avatar.root.position;
+    player.avatar.root.position.set(p.x + 1.35, 0, p.z + 0.4);
+  }
+}
+
+window.__sim = {
+  getState() {
+    const pos = player.avatar.root.position;
+    const zone = zoneAt(pos.x, pos.z);
+    const nearNames = [];
+    const group = nearestGroup(pos.x, pos.z);
+    if (group) nearNames.push(group.id);
+    for (const npc of npcs) {
+      if (npc.distanceTo(pos.x, pos.z) < 6) nearNames.push(npc.def.name);
+    }
+    return {
+      zone: zone.name,
+      playerPos: { x: pos.x, y: pos.y, z: pos.z },
+      nearby: nearNames,
+      inConversation: !!session,
+      conversationId: session ? session.conversationId : null,
+      lastNpcLine,
+      choices: choiceList.map((choice) => choice.text),
+    };
+  },
+  teleportTo,
+  join: tryJoin,
+  chat: tryChat,
+  say(text) { submitText(String(text || '')); },
+  choose(index) {
+    const choice = choiceList[index];
+    if (choice) submitText(choice.text);
+  },
+  leave: closeConversation,
+};
 
 const clock = new THREE.Clock();
 window.addEventListener('resize', () => {

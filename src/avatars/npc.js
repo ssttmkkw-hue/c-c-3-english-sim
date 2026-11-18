@@ -1,4 +1,4 @@
-import { animateAvatar, createAvatar, triggerReact } from './avatar.js';
+import { animateAvatar, createAvatar, lookHeadAt, triggerReact } from './avatar.js';
 import { blocked } from '../world/zones.js';
 import { setBubbleText } from './speechbubble.js';
 
@@ -24,6 +24,8 @@ export function createNPC(def, anchor, colliders) {
     wanderTarget: null,
     baseX: x,
     baseZ: z,
+    goal: null,
+    look: null,
   };
 
   function say(text, now) {
@@ -39,10 +41,36 @@ export function createNPC(def, anchor, colliders) {
     avatar.root.rotation.y = Math.atan2(tx - avatar.root.position.x, tz - avatar.root.position.z);
   }
 
+  function setGoal(x, z, faceX, faceZ) {
+    state.goal = { x, z, faceX, faceZ };
+  }
+
+  function clearGoal() {
+    state.goal = null;
+  }
+
+  function stepToward(tx, tz, speed, dt) {
+    const p = avatar.root.position;
+    const dx = tx - p.x;
+    const dz = tz - p.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.08) return false;
+    const step = Math.min(speed * dt, len);
+    const nx = p.x + (dx / len) * step;
+    const nz = p.z + (dz / len) * step;
+    if (!blocked(nx, p.z, radius, colliders)) avatar.root.position.x = nx;
+    if (!blocked(avatar.root.position.x, nz, radius, colliders)) avatar.root.position.z = nz;
+    return true;
+  }
+
   function update(dt, now, paused) {
     let moving = false;
     let speed = 0;
-    if (def.wander && !paused) {
+    if (state.goal) {
+      moving = stepToward(state.goal.x, state.goal.z, 3.4, dt);
+      speed = moving ? 3.4 : 0;
+      face(state.goal.faceX, state.goal.faceZ);
+    } else if (def.wander && !paused) {
       const p = avatar.root.position;
       if (!state.wanderTarget || Math.hypot(state.wanderTarget.x - p.x, state.wanderTarget.z - p.z) < 0.35) {
         const home = def.home || [state.baseX, state.baseZ];
@@ -64,6 +92,8 @@ export function createNPC(def, anchor, colliders) {
       moving = true;
     }
     animateAvatar(avatar, dt, moving, speed, state);
+    if (state.look) lookHeadAt(avatar, state.look.x, state.look.z, dt);
+    else avatar.head.rotation.y *= 0.9;
     hideBubble(now);
   }
 
@@ -75,6 +105,17 @@ export function createNPC(def, anchor, colliders) {
     update,
     react(kind) {
       triggerReact(state, kind);
+    },
+    setGoal,
+    clearGoal,
+    lookAt(x, z) {
+      state.look = { x, z };
+    },
+    clearLook() {
+      state.look = null;
+    },
+    bubbleUntil() {
+      return state.bubbleUntil;
     },
     distanceTo(x, z) {
       const p = avatar.root.position;

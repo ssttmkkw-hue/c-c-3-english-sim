@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Plaza English</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231565c0'/%3E%3Ccircle cx='16' cy='13' r='5' fill='%23ffe0bd'/%3E%3Cpath d='M8 26c1.5-4 4.2-6 8-6s6.5 2 8 6' fill='%23ffe082'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
   <script type="importmap">
   {
@@ -18,18 +19,20 @@
   <div id="hud">
     <header id="top">
       <div id="zone-name">Plaza</div>
-      <div id="mic-state" data-state="idle">Mic idle</div>
+      <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
       <label id="tts-label"><input type="checkbox" id="tts" /> Read lines aloud</label>
     </header>
+    <canvas id="minimap" width="160" height="160" aria-label="Minimap"></canvas>
     <div id="ambient" class="hidden"></div>
     <div id="prompt" class="hidden"></div>
     <section id="chat" class="hidden">
       <div id="chat-log"></div>
+      <div id="transcript" class="hidden"></div>
       <div id="choices"></div>
       <form id="say-form">
         <input id="say" type="text" maxlength="160" placeholder="Type a reply, or hold Space / the mic button" autocomplete="off" />
         <button type="submit">Send</button>
-        <button type="button" id="mic-btn">Hold to talk</button>
+        <button type="button" id="mic-btn" title="Hold to talk. Speech recognition needs Chrome or Edge on localhost or https.">Hold to talk</button>
         <button type="button" id="leave">Leave</button>
       </form>
     </section>

@@ -37,10 +37,21 @@ html, body {
 #mic-state[data-state="listening"] { background: #c62828; }
 #mic-state[data-state="unsupported"] { background: #546e7a; }
 #tts-label { padding: 8px 12px; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+#minimap {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 168px;
+  height: 168px;
+  border-radius: 12px;
+  background: rgba(16, 32, 39, 0.78);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
 #ambient {
   position: absolute;
   top: 64px;
-  right: 16px;
+  left: 16px;
   width: min(320px, 40vw);
   padding: 10px 12px;
   font-size: 13px;
@@ -68,8 +79,17 @@ html, body {
   font-size: 15px;
 }
 #chat-log p { margin: 0 0 8px; }
-#chat-log strong { color: #ffe082; margin-right: 6px; }
+#chat-log strong { margin-right: 6px; }
 #chat-log .you strong { color: #80d8ff; }
+#chat-log .heard { color: #b2dfdb; font-style: italic; }
+#chat-log .recap { background: rgba(255, 224, 130, 0.16); border-radius: 8px; padding: 8px; }
+#chat-log .recap strong { color: #ffe082; }
+#transcript {
+  margin: 6px 0;
+  color: #b3e5fc;
+  font-size: 14px;
+  min-height: 1.2em;
+}
 #choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 #choices button, #say-form button, #touch-actions button {
   border: 0;
