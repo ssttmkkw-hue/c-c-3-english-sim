@@ -12,6 +12,7 @@ A static, VRChat-style plaza for beginner–intermediate English practice. Avata
 - Three daily missions, with a streak when you finish all of them. On a phone they collapse to a `Today 0/3` pill. 每天三个任务。手机上收成 `Today 0/3` 小胶囊。
 - Avatar panel in Settings: display name (default You), body color, and hair style, saved on this browser. 设置里的形象：名字（默认 You）、衣服颜色、发型，存在本地。
 - A short 3-step tip the first time you close the help card. 第一次关掉帮助后，有三步可跳过的提示。
+- Groups take turns. One person speaks at a time, listeners look at the speaker, and someone may nod or say a short “Mm-hm.” Joining waits until the current line ends, then a welcome. Leaving says a short goodbye and the chat continues from the next scene. When it is your turn, the panel glows with “Your turn — take your time.” There is no countdown. After a quiet moment, someone may say “Take your time.” 小组轮流说话。一次只有一个人说，其他人看着说话的人，有时会点头或轻轻说 “Mm-hm”。加入时会等当前这句说完，再欢迎你。离开时有一句短告别，然后从下一小段接着聊。轮到你时，面板会轻轻发光，并显示 “Your turn — take your time”。没有倒计时。安静一会儿后，可能会有人说 “Take your time.”。
 
 ## Run / 运行
 
@@ -28,9 +29,10 @@ Open `http://localhost:8000`.
 - **Walk / 移动:** WASD or arrow keys. Hold Shift to run. On a touch device, a joystick appears.
 - **Camera / 镜头:** Drag with the mouse to orbit. Scroll the wheel to zoom. The camera eases behind you, and it pulls back to frame a conversation.
 - **Emotes / 表情:** `1` wave, `2` nod, `3` jump.
-- **Join / 加入:** Near a group, press **E** (or Join). A chooser lists that zone’s conversations with a title and a level (Beginner or Intermediate). Pick one. Members walk into a circle with you and turn inward. 靠近人群按 E，先看到标题和难度，再加入。
+- **Join / 加入:** Near a group, press **E** (or Join). A chooser lists that zone’s conversations with a title and a level (Beginner or Intermediate). Pick one. If someone is mid-sentence, they finish, then say hello. Members walk into a circle with you and turn inward. Nearby ambient chat is a few short scenes, and the group remembers where it left off. 靠近人群按 E，先看到标题和难度，再加入。如果有人说到一半，会等这句说完再打招呼。旁边的闲聊是几段小对话，离开后从下一段接着说。
 - **1-on-1 / 一对一:** Near a person with a personal chat, press **F** (or Talk). They turn to face you. Extra people stand around the plaza: Tourist Nina (directions), Librarian Ada (a short grammar exercise), Musician Jo, and Customer Bea (shop-counter phrases). 广场上还有游客 Nina、图书管理员 Ada、街头乐手 Jo、商店顾客 Bea。
-- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or the mic button). On a narrow screen the mic button is an icon plus **Talk**, and the buttons sit on two rows. 窄屏上麦克风按钮是图标加 Talk，按钮分成两行。
+- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or the mic button). On a narrow screen the mic button is an icon plus **Talk**, and the buttons sit on two rows. NPC lines in a chat also take turns, with a short pause between them. 窄屏上麦克风按钮是图标加 Talk，按钮分成两行。对话里的 NPC 也轮流说，两句之间有一点停顿。
+- **Your turn / 轮到你:** A soft glow and the words “Your turn — take your time” (轮到你了，慢慢来). Nobody counts down. If you are quiet for a bit, an NPC says “Take your time.” 没有倒计时。你安静一会儿，会有人说 “Take your time.”。
 - **Hint / 提示:** Shows the first words of the replies you can give. 显示可用回答的前几个词。
 - **Retry / 再说:** Say your line again. If the script is asking “Did you mean …?”, Retry cancels that guess. 再讲一次；如果正在确认，就取消这次猜测。
 - **Leave / 离开:** **Esc** or **Leave**. The group goes back to its own ambient chat. Esc also closes the chooser, practice, notebook, settings, and the help card. Starting or leaving a conversation closes the chooser too. Esc 也会关闭选择列表、跟读、笔记本、设置和帮助。开始或离开对话时，选择列表会关掉。
@@ -61,7 +63,7 @@ Push-to-talk uses the browser Web Speech API (`SpeechRecognition` / `webkitSpeec
 - `src/avatars/` — procedural bodies (hair, face, clothes), idle/walk, emotes, a glow under whoever is speaking, speech bubbles.
 - `src/input/` — keyboard (`event.code`, with `event.key` fallback), mouse orbit, touch stick, speech.
 - `src/ui/hud.js` — zone, chat log, choices, mic state, chooser, settings, notebook, practice, daily missions.
-- `src/dialogue/` — engine, providers, and `match.js` (reply scores and listen-and-repeat word alignment).
+- `src/dialogue/` — engine, providers, `SceneDirector.js` (turn-taking), and `match.js` (reply scores and listen-and-repeat word alignment).
 - `src/progress/` — notebook and daily missions (`localStorage`).
 - `src/world/ambience.js` — day sky, clouds, park leaves, cafe steam.
 - `src/data/` — characters, the conversation catalog, legacy Chinese lines, and zone scripts in `src/data/zones/`.
@@ -106,3 +108,7 @@ The live provider is `ScriptedProvider`. It walks the graphs in `src/data/` and 
 - `joinConversation(id)` — starts that group chat, or a 1-on-1 when `id` is a character id
 - `join()` opens the chooser for the nearest group. `chat()`, `say(text)`, `choose(index)`, `leave()`, `chatWith(name)`
 - `getSettings()` / `setSettings(partial)` — `tts`, `voiceURI`, `rate`, `subtitles`, `zh`, `difficulty` (`any`, `beginner`, `intermediate`)
+- `getDirector(groupId)` for `cafe`, `park`, `class`, `shop` → `{ state, speaker, lineId, sceneId, overlapsDetected }` (`state` is `gap`, `leadIn`, `speaking`, `tail`, or `held`)
+- `mainBubbleOverlaps()` → how many times two main speaking bubbles in one group were visible together (stays `0`)
+- `timeScale` — sim clock multiplier (default `1`, clamped from `0.25` to `40`). `now()` reads sim time. `setTimeScale(n)` / `getTimeScale()` do the same as the property.
+- `requestVisitor(groupId, text)` queues a wanderer’s line for the next gap. `bubbleOf(name)` → `{ text, kind, main }`

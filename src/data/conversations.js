@@ -21,40 +21,224 @@ export const VISITOR_LINES = {
   ],
 };
 
+function ambientLine(id, speaker, text, extra = {}) {
+  return { id, speaker, text, ...extra };
+}
+
+/** Short scenes. Each zone loops scene by scene, never restarting mid-thread. */
 export const AMBIENT = {
   'cafe.ambient': [
-    { speaker: 'Barista Tom', text: 'The lunch rush is quiet today. Can I pour anyone a refill?' },
-    { speaker: 'Player: Mika_88', text: 'Yes, please. This latte is smooth. Is the milk oat milk?' },
-    { speaker: 'Barista Tom', text: 'It is. We also have dairy milk if you want to switch.' },
-    { speaker: 'Player: Leo_cafe', text: 'I might get an iced tea next. Is it sweet?' },
-    { speaker: 'Barista Tom', text: 'A little. I can make it with less sugar.' },
-    { speaker: 'Player: Mika_88', text: 'Good idea. I will sit by the window after this cup.' },
+    {
+      id: 'refill',
+      lines: [
+        ambientLine('refill-ask', 'Barista Tom', 'The lunch rush is quiet today. Can I pour anyone a refill?', {
+          to: 'Player: Mika_88',
+          back: [{ who: 'Player: Leo_cafe', text: 'Mm-hm', at: 0.62 }],
+        }),
+        ambientLine('refill-oat', 'Player: Mika_88', 'Yes, please. This latte is smooth. Is the milk oat milk?', {
+          to: 'Barista Tom',
+        }),
+        ambientLine('refill-yes', 'Barista Tom', 'It is. We also have dairy milk if you want to switch.', {
+          to: 'Player: Mika_88',
+          quick: true,
+          react: [{ who: 'Player: Mika_88', kind: 'nod', at: 0.5 }],
+        }),
+      ],
+    },
+    {
+      id: 'iced-tea',
+      lines: [
+        ambientLine('tea-ask', 'Player: Leo_cafe', 'I might get an iced tea next. Is it sweet?', {
+          to: 'Barista Tom',
+        }),
+        ambientLine('tea-sugar', 'Barista Tom', 'A little. I can make it with less sugar.', {
+          to: 'Player: Leo_cafe',
+          quick: true,
+          gapAfter: [0.35, 0.7],
+        }),
+        ambientLine('tea-window', 'Player: Mika_88', 'Good idea. I will sit by the window after this cup.', {
+          to: 'Player: Leo_cafe',
+          back: [{ who: 'Player: Leo_cafe', text: 'Nice', at: 0.7 }],
+        }),
+      ],
+    },
+    {
+      id: 'window-seat',
+      lines: [
+        ambientLine('win-free', 'Barista Tom', 'The window seat is free. The light is nice this afternoon.', {
+          to: 'Player: Mika_88',
+        }),
+        ambientLine('win-join', 'Player: Leo_cafe', 'I can bring the teas over. Want the corner table?', {
+          to: 'Player: Mika_88',
+          back: [{ who: 'Barista Tom', text: 'Oh really?', at: 0.58 }],
+        }),
+        ambientLine('win-yes', 'Player: Mika_88', 'Yes, please. I will save you a chair.', {
+          to: 'Player: Leo_cafe',
+          quick: true,
+        }),
+      ],
+    },
   ],
   'park.ambient': [
-    { speaker: 'Ranger Priya', text: 'The breeze is nice today. Are you both staying in the park?' },
-    { speaker: 'Player: JuneWalks', text: 'For a bit. I love this weather. It is warm, but not hot.' },
-    { speaker: 'Player: Ken_outdoors', text: 'Same. Last weekend it rained, so I stayed inside.' },
-    { speaker: 'Player: JuneWalks', text: 'What are you doing this weekend, Ken?' },
-    { speaker: 'Player: Ken_outdoors', text: 'A short hike if the sky stays clear. Want to come?' },
-    { speaker: 'Ranger Priya', text: 'Take water, and please keep to the path.' },
+    {
+      id: 'breeze',
+      lines: [
+        ambientLine('breeze-ask', 'Ranger Priya', 'The breeze is nice today. Are you both staying in the park?', {
+          to: 'Player: JuneWalks',
+          back: [{ who: 'Player: Ken_outdoors', text: 'Mm-hm', at: 0.6 }],
+        }),
+        ambientLine('breeze-warm', 'Player: JuneWalks', 'For a bit. I love this weather. It is warm, but not hot.', {
+          to: 'Ranger Priya',
+        }),
+        ambientLine('breeze-rain', 'Player: Ken_outdoors', 'Same. Last weekend it rained, so I stayed inside.', {
+          to: 'Player: JuneWalks',
+          react: [{ who: 'Ranger Priya', kind: 'nod', at: 0.55 }],
+        }),
+      ],
+    },
+    {
+      id: 'weekend',
+      lines: [
+        ambientLine('week-ask', 'Player: JuneWalks', 'What are you doing this weekend, Ken?', {
+          to: 'Player: Ken_outdoors',
+        }),
+        ambientLine('week-hike', 'Player: Ken_outdoors', 'A short hike if the sky stays clear. Want to come?', {
+          to: 'Player: JuneWalks',
+          back: [{ who: 'Player: JuneWalks', text: 'Nice', at: 0.66 }],
+        }),
+        ambientLine('week-path', 'Ranger Priya', 'Take water, and please keep to the path.', {
+          to: 'Player: Ken_outdoors',
+        }),
+      ],
+    },
+    {
+      id: 'fountain',
+      lines: [
+        ambientLine('fount-ask', 'Ranger Priya', 'The fountain is a short walk from here. Do you want directions?', {
+          to: 'Player: JuneWalks',
+        }),
+        ambientLine('fount-far', 'Player: JuneWalks', 'How far is it from this bench?', {
+          to: 'Ranger Priya',
+          quick: true,
+        }),
+        ambientLine('fount-ten', 'Player: Ken_outdoors', 'About ten minutes if we keep to the path.', {
+          to: 'Player: JuneWalks',
+          back: [{ who: 'Ranger Priya', text: 'Mm-hm', at: 0.64 }],
+        }),
+      ],
+    },
   ],
   'class.ambient': [
-    { speaker: 'Teacher Lin', text: 'Let us practice introductions. Noah, would you start?' },
-    { speaker: 'Student Noah', text: 'Hi. My name is Noah. I am from Busan. I like soccer.' },
-    { speaker: 'Player: Hana_studies', text: 'Nice to meet you. I am Hana. I study design.' },
-    { speaker: 'Teacher Lin', text: 'Lovely. A quick grammar check: I have lived here for two years.' },
-    { speaker: 'Student Noah', text: 'So we use have lived for something that continues?' },
-    { speaker: 'Teacher Lin', text: 'Exactly. For is with a period of time. Since is with a start point.' },
+    {
+      id: 'introductions',
+      lines: [
+        ambientLine('intro-start', 'Teacher Lin', 'Let us practice introductions. Noah, would you start?', {
+          to: 'Student Noah',
+        }),
+        ambientLine('intro-noah', 'Student Noah', 'Hi. My name is Noah. I am from Busan. I like soccer.', {
+          to: 'Teacher Lin',
+          back: [{ who: 'Player: Hana_studies', text: 'Mm-hm', at: 0.58 }],
+        }),
+        ambientLine('intro-hana', 'Player: Hana_studies', 'Nice to meet you. I am Hana. I study design.', {
+          to: 'Student Noah',
+          react: [{ who: 'Teacher Lin', kind: 'nod', at: 0.5 }],
+        }),
+      ],
+    },
+    {
+      id: 'grammar',
+      lines: [
+        ambientLine('gram-check', 'Teacher Lin', 'Lovely. A quick grammar check: I have lived here for two years.', {
+          to: 'Student Noah',
+        }),
+        ambientLine('gram-ask', 'Student Noah', 'So we use have lived for something that continues?', {
+          to: 'Teacher Lin',
+          back: [{ who: 'Player: Hana_studies', text: 'Oh really?', at: 0.62 }],
+        }),
+        ambientLine('gram-yes', 'Teacher Lin', 'Exactly. For is with a period of time. Since is with a start point.', {
+          to: 'Student Noah',
+          quick: true,
+        }),
+      ],
+    },
+    {
+      id: 'one-more',
+      lines: [
+        ambientLine('more-try', 'Teacher Lin', 'Let us try one more sentence before we stop.', {
+          to: 'Student Noah',
+        }),
+        ambientLine('more-soccer', 'Student Noah', 'I have played soccer for five years.', {
+          to: 'Teacher Lin',
+          gapAfter: [0.4, 0.8],
+        }),
+        ambientLine('more-nice', 'Player: Hana_studies', 'That is a clear example. Nice, Noah.', {
+          to: 'Student Noah',
+          back: [{ who: 'Teacher Lin', text: 'Nice', at: 0.7 }],
+        }),
+      ],
+    },
   ],
   'shop.ambient': [
-    { speaker: 'Clerk Sam', text: 'Welcome in. The blue jackets just arrived. Want a size check?' },
-    { speaker: 'Player: Mei_shop', text: 'How much is the blue jacket?' },
-    { speaker: 'Clerk Sam', text: 'It is forty-eight dollars. Medium and large are on the shelf.' },
-    { speaker: 'Player: Omar_22', text: 'Do you have a smaller size? Large is too big for me.' },
-    { speaker: 'Clerk Sam', text: 'Small is in the back. I can bring it out.' },
-    { speaker: 'Player: Mei_shop', text: 'I will think about the price and look at the hats too.' },
+    {
+      id: 'jackets',
+      lines: [
+        ambientLine('jack-welcome', 'Clerk Sam', 'Welcome in. The blue jackets just arrived. Want a size check?', {
+          to: 'Player: Mei_shop',
+          back: [{ who: 'Player: Omar_22', text: 'Mm-hm', at: 0.6 }],
+        }),
+        ambientLine('jack-price', 'Player: Mei_shop', 'How much is the blue jacket?', {
+          to: 'Clerk Sam',
+          quick: true,
+        }),
+        ambientLine('jack-cost', 'Clerk Sam', 'It is forty-eight dollars. Medium and large are on the shelf.', {
+          to: 'Player: Mei_shop',
+        }),
+      ],
+    },
+    {
+      id: 'sizes',
+      lines: [
+        ambientLine('size-ask', 'Player: Omar_22', 'Do you have a smaller size? Large is too big for me.', {
+          to: 'Clerk Sam',
+        }),
+        ambientLine('size-back', 'Clerk Sam', 'Small is in the back. I can bring it out.', {
+          to: 'Player: Omar_22',
+          quick: true,
+          react: [{ who: 'Player: Mei_shop', kind: 'nod', at: 0.45 }],
+        }),
+        ambientLine('size-think', 'Player: Mei_shop', 'I will think about the price and look at the hats too.', {
+          to: 'Clerk Sam',
+          back: [{ who: 'Clerk Sam', text: 'Nice', at: 0.68 }],
+        }),
+      ],
+    },
+    {
+      id: 'hats',
+      lines: [
+        ambientLine('hat-price', 'Clerk Sam', 'The wool hats are on the front table. They are twenty dollars.', {
+          to: 'Player: Mei_shop',
+        }),
+        ambientLine('hat-try', 'Player: Omar_22', 'I might try a hat if the jacket feels too big.', {
+          to: 'Clerk Sam',
+          back: [{ who: 'Player: Mei_shop', text: 'Oh really?', at: 0.6 }],
+        }),
+        ambientLine('hat-hold', 'Clerk Sam', 'No rush at all. I can hold the small jacket for you.', {
+          to: 'Player: Omar_22',
+        }),
+      ],
+    },
   ],
 };
+
+export function ambientEntries(scenes) {
+  const lines = [];
+  if (!Array.isArray(scenes)) return lines;
+  for (const scene of scenes) {
+    if (scene && Array.isArray(scene.lines)) lines.push(...scene.lines);
+    else if (scene && scene.text) lines.push(scene);
+  }
+  return lines;
+}
 
 function node(speaker, lines, choices, extra = {}) {
   return { speaker, lines, choices, ...extra };
@@ -631,8 +815,8 @@ export function missingZh() {
       }
     }
   }
-  for (const [id, lines] of Object.entries(AMBIENT)) {
-    for (const line of lines) add('ambient', id, line.text, line.zh);
+  for (const [id, scenes] of Object.entries(AMBIENT)) {
+    for (const line of ambientEntries(scenes)) add('ambient', id, line.text, line.zh);
   }
   for (const [id, lines] of Object.entries(VISITOR_LINES)) {
     for (const line of lines) {

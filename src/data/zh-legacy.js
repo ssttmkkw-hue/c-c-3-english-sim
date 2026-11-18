@@ -29,6 +29,21 @@ export const LEGACY_ZH = {
   "Do you have a smaller size? Large is too big for me.": "有更小的尺码吗？大号对我太大了。",
   "Small is in the back. I can bring it out.": "小号在后面。我可以拿出来。",
   "I will think about the price and look at the hats too.": "我再考虑一下价格，也看看帽子。",
+  "The window seat is free. The light is nice this afternoon.": "靠窗的位子空着。今天下午光线很好。",
+  "I can bring the teas over. Want the corner table?": "我可以把茶端过去。要角落那张桌子吗？",
+  "Yes, please. I will save you a chair.": "好的。我给你留一把椅子。",
+  "The fountain is a short walk from here. Do you want directions?": "喷泉离这里很近。要我指路吗？",
+  "How far is it from this bench?": "离这张长椅有多远？",
+  "About ten minutes if we keep to the path.": "沿着小路大约十分钟。",
+  "Let us try one more sentence before we stop.": "结束前我们再练一句。",
+  "I have played soccer for five years.": "我踢了五年足球。",
+  "That is a clear example. Nice, Noah.": "这是个清楚的例子。很好，Noah。",
+  "The wool hats are on the front table. They are twenty dollars.": "羊毛帽在前面的桌子上。二十美元。",
+  "I might try a hat if the jacket feels too big.": "如果外套太大，我也许试试帽子。",
+  "No rush at all. I can hold the small jacket for you.": "不着急。我可以帮你留着小号外套。",
+  "Oh, hi! Join us.": "哦，你好！一起来吧。",
+  "Nice talking with you. See you around.": "聊得很开心。回头见。",
+  "Take your time.": "慢慢来。",
   "Hey, welcome to the plaza cafe. What can I get started for you?": "嘿，欢迎来到广场咖啡馆。想喝点什么？",
   "Pull up a chair. We are just chatting about drinks.": "拉把椅子过来。我们正在聊饮料。",
   "I'd like a latte, please.": "请给我一杯拿铁。",
@@ -284,7 +299,14 @@ export function applyLegacyZh(graphs, ambient, visitors) {
       }
     }
   }
-  for (const lines of Object.values(ambient || {})) {
+  for (const scenes of Object.values(ambient || {})) {
+    const lines = [];
+    if (Array.isArray(scenes)) {
+      for (const scene of scenes) {
+        if (scene && Array.isArray(scene.lines)) lines.push(...scene.lines);
+        else if (scene && scene.text) lines.push(scene);
+      }
+    }
     for (const line of lines) {
       if (line) line.zh = fillZh(line.text, line.zh);
     }
