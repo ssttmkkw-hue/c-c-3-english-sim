@@ -64,6 +64,20 @@ export const MISSION_POOL = [
     kind: 'group-end',
     zone: 'classroom',
   },
+  {
+    id: 'skit-3',
+    kind: 'skit-line',
+    goal: 3,
+    title: 'Say 3 lines in skits',
+    titleZh: '在小剧场里说 3 句话',
+  },
+  {
+    id: 'show-1',
+    kind: 'show',
+    goal: 1,
+    title: 'Stay for a whole show',
+    titleZh: '看完整一场演出',
+  },
 ];
 
 function localDate(date) {
@@ -217,6 +231,14 @@ export function createMissions(now = () => new Date()) {
     });
   }
 
+  function noteSkitLine() {
+    return bump('skit-line');
+  }
+
+  function noteShow() {
+    return bump('show');
+  }
+
   load();
-  return { get: view, noteVoice, notePractice, noteSolo, noteGroupEnd };
+  return { get: view, noteVoice, notePractice, noteSolo, noteGroupEnd, noteSkitLine, noteShow };
 }

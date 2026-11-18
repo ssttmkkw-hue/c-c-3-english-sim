@@ -240,6 +240,12 @@ skit = createSkitPlayer({
     hud.celebrate(extra && extra.theater ? 'Applause!' : text);
     if (extra && extra.theater) applaudAudience();
   },
+  onLine() {
+    refreshMissions(missions.noteSkitLine());
+  },
+  onShow() {
+    refreshMissions(missions.noteShow());
+  },
 });
 
 let watchingShow = false;

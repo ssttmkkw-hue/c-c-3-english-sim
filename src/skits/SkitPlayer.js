@@ -225,7 +225,12 @@ export function createSkitPlayer(opts) {
     const path = watchPath(skit);
     const ok = await playBeats(token, path);
     if (!ok || token !== run) return;
-    if (phase === 'watch') openRoles();
+    if (phase === 'watch') {
+      if (fromTheater && opts.onShow) {
+        try { opts.onShow(); } catch (err) { /* a finished show still opens roles */ }
+      }
+      openRoles();
+    }
   }
 
   async function runPerform(token) {
@@ -286,7 +291,12 @@ export function createSkitPlayer(opts) {
     if (opts.calmPatience) opts.calmPatience();
     if (text == null || token !== run) return null;
     const spoken = wordsOf(text).length > 0;
-    if (spoken) linesSaid += 1;
+    if (spoken) {
+      linesSaid += 1;
+      if (opts.onLine) {
+        try { opts.onLine(beat); } catch (err) { /* progress is optional */ }
+      }
+    }
     feedback = `Nice! Another way to say it: ${beat.text}`;
     subtitle = {
       speaker: 'You',
