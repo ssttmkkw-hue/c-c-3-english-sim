@@ -73,15 +73,18 @@
   </div>
   <div id="chooser" class="hidden">
     <div id="chooser-card">
-      <h2>Join a conversation (选择对话)</h2>
-      <p id="chooser-note"></p>
-      <div id="chooser-list"></div>
-      <button type="button" id="chooser-cancel">Cancel (取消)</button>
+      <div class="card-head"><h2>Join a conversation (选择对话)</h2></div>
+      <div class="card-body">
+        <p id="chooser-note"></p>
+        <div id="chooser-list"></div>
+      </div>
+      <div class="card-foot"><button type="button" id="chooser-cancel">Cancel (取消)</button></div>
     </div>
   </div>
   <div id="settings" class="hidden">
     <div id="settings-card">
-      <h2>Settings (设置)</h2>
+      <div class="card-head"><h2>Settings (设置)</h2></div>
+      <div class="card-body">
       <label class="set-row"><input type="checkbox" id="set-tts" /> Read lines aloud (朗读)</label>
       <label class="set-row">Voice (英语语音)
         <select id="set-voice"></select>
@@ -108,18 +111,21 @@
         <p class="set-label">Hair (发型)</p>
         <div id="avatar-hairs" class="swatches"></div>
       </div>
-      <button type="button" id="settings-close">Close (关闭)</button>
+      </div>
+      <div class="card-foot"><button type="button" id="settings-close">Close (关闭)</button></div>
     </div>
   </div>
   <div id="practice" class="hidden">
     <div id="practice-card">
-      <h2>Listen &amp; Repeat (跟读练习)</h2>
+      <div class="card-head"><h2>Listen &amp; Repeat (跟读练习)</h2></div>
+      <div class="card-body">
       <p id="practice-phrase"></p>
       <p id="practice-zh"></p>
       <div id="practice-words"></div>
       <p id="practice-stars"></p>
       <p id="practice-heard"></p>
-      <div id="practice-actions">
+      </div>
+      <div class="card-foot" id="practice-actions">
         <button type="button" id="practice-play">Play (播放)</button>
         <button type="button" id="practice-mic">Hold to speak</button>
         <form id="practice-form">
@@ -132,10 +138,12 @@
   </div>
   <div id="notebook" class="hidden">
     <div id="notebook-card">
-      <h2>Notebook (笔记本)</h2>
-      <p id="notebook-empty" class="hidden">No phrases yet. Finish a chat, or tap ☆ on a line.</p>
-      <div id="notebook-list"></div>
-      <button type="button" id="notebook-close">Close (关闭)</button>
+      <div class="card-head"><h2>Notebook (笔记本)</h2></div>
+      <div class="card-body">
+        <p id="notebook-empty" class="hidden">No phrases yet. Finish a chat, or tap ☆ on a line.</p>
+        <div id="notebook-list"></div>
+      </div>
+      <div class="card-foot"><button type="button" id="notebook-close">Close (关闭)</button></div>
     </div>
   </div>
   <div id="tips" class="hidden">
@@ -150,7 +158,8 @@
   </div>
   <div id="help" class="hidden">
     <div id="help-card">
-      <h2>Controls (操作)</h2>
+      <div class="card-head"><h2>Controls (操作)</h2></div>
+      <div class="card-body">
       <ul>
         <li>Walk with WASD or arrow keys (WASD 或方向键移动). Hold Shift to run (按住 Shift 跑步).</li>
         <li>Drag to look around (拖动旋转镜头). Scroll to zoom (滚轮缩放).</li>
@@ -169,7 +178,8 @@
         <li>After this card, three short tips show once (关闭说明后会有三步提示，只出现一次). Skip remembers that choice.</li>
         <li>Press H or ? to open or close this list (按 H 或 ? 打开或关闭说明). Esc or Got it also closes it (Esc 或知道了也会关闭).</li>
       </ul>
-      <button type="button" id="help-close">Got it (知道了)</button>
+      </div>
+      <div class="card-foot"><button type="button" id="help-close">Got it (知道了)</button></div>
     </div>
   </div>
   <script type="module" src="src/main.js"></script>

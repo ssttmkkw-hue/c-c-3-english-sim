@@ -141,11 +141,21 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   background: #102027;
   color: #fff;
   border-radius: 16px;
-  padding: 18px 18px 14px;
-  max-height: min(80vh, 640px);
-  overflow: auto;
+  padding: 0;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-#help-card h2, #chooser-card h2, #settings-card h2, #practice-card h2, #notebook-card h2 { margin: 0 0 10px; font-size: 20px; }
+.card-head, .card-foot {
+  flex: 0 0 auto;
+  background: #102027;
+  z-index: 1;
+}
+.card-head { padding: 16px 18px 8px; border-radius: 16px 16px 0 0; }
+.card-body { overflow: auto; min-height: 0; padding: 4px 18px 8px; }
+.card-foot { padding: 8px 18px 14px; border-radius: 0 0 16px 16px; }
+#help-card h2, #chooser-card h2, #settings-card h2, #practice-card h2, #notebook-card h2 { margin: 0; font-size: 20px; }
 #chooser-note { margin: 0 0 10px; color: #ffe082; min-height: 0; }
 #chooser-note:empty { display: none; }
 #chooser-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -188,12 +198,23 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   font-size: 14px;
   min-height: 1.2em;
 }
-#choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-#choices button {
+#choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  min-width: 0;
+  max-height: 22vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+#choices button.choice {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
+  width: 100%;
+  white-space: normal;
 }
 #choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close, #practice-actions button, #practice-form button, #notebook-close, .note-actions button {
   border: 0;
@@ -204,7 +225,8 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   font-weight: 600;
   cursor: pointer;
 }
-#say-form { display: flex; gap: 8px; flex-wrap: wrap; }
+#say-form { display: flex; gap: 8px; flex-wrap: nowrap; align-items: center; }
+#say-form button { flex: 0 0 auto; white-space: nowrap; }
 #mic-btn {
   display: inline-flex;
   align-items: center;
@@ -213,7 +235,8 @@ body.show-zh .zh { display: block; margin-top: 2px; }
 }
 #mic-btn .mic-icon { flex: 0 0 auto; display: block; }
 #say {
-  flex: 1 1 180px;
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: 999px;
   border: 0;
   padding: 10px 14px;
@@ -319,9 +342,11 @@ body.chatting #touch { display: none !important; }
   #say { grid-column: 1 / -1; min-width: 0; width: 100%; flex: none; }
   #say-form {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 6px;
   }
+  #say-form > button:nth-child(-n+4) { grid-column: span 2; }
+  #say-form > button:nth-child(n+5) { grid-column: span 3; }
   #say-form button, #mic-btn {
     width: 100%;
     min-width: 0;
@@ -495,10 +520,22 @@ body.chatting #touch { display: none !important; }
   padding: 2px 6px;
   font-weight: 700;
 }
-#choices { align-items: stretch; }
-.choice-row { display: flex; gap: 4px; align-items: stretch; max-width: 100%; }
-.choice-row .choice { flex: 1; }
-#choices button.save-phrase { flex: 0 0 auto; align-self: center; }
+.choice-chip {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+}
+.choice-chip .choice { padding-right: 28px; }
+#choices button.save-phrase {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1.2;
+  min-width: 0;
+}
 body.chatting #missions { bottom: auto; top: 64px; }
 @media (max-width: 520px) {
   #missions {

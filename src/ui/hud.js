@@ -517,18 +517,19 @@ export function createHUD() {
     hintsEl.innerHTML = '';
     hintBtn.classList.toggle('hidden', !choices.length);
     for (const choice of choices) {
-      const row = document.createElement('div');
-      row.className = 'choice-row';
+      const chip = document.createElement('div');
+      chip.className = 'choice-chip';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'choice';
       const label = document.createElement('span');
+      label.className = 'choice-label';
       label.textContent = choice.text;
       button.appendChild(label);
       addZh(button, choice.zh);
       button.addEventListener('click', () => onChoice(choice.text, choice.zh || ''));
-      row.append(button, saveButton(choice.text, choice.zh));
-      choicesEl.appendChild(row);
+      chip.append(button, saveButton(choice.text, choice.zh));
+      choicesEl.appendChild(chip);
     }
   }
 
