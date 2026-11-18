@@ -21,11 +21,14 @@ Open `http://localhost:8000`.
 - **Emotes / 表情:** `1` wave, `2` nod, `3` jump.
 - **Join / 加入:** Near a group, press **E** (or Join). A chooser lists that zone’s conversations with a title and a level (Beginner or Intermediate). Pick one. Members walk into a circle with you and turn inward. 靠近人群按 E，先看到标题和难度，再加入。
 - **1-on-1 / 一对一:** Near a person with a personal chat, press **F** (or Talk). They turn to face you. Extra people stand around the plaza: Tourist Nina (directions), Librarian Ada (a short grammar exercise), Musician Jo, and Customer Bea (shop-counter phrases). 广场上还有游客 Nina、图书管理员 Ada、街头乐手 Jo、商店顾客 Bea。
-- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or **Hold to talk**).
+- **Reply / 回答:** Choice buttons, the text box, or push-to-talk (hold **Space** or the mic button). On a narrow screen the mic button is an icon plus **Talk**, and the buttons sit on two rows. 窄屏上麦克风按钮是图标加 Talk，按钮分成两行。
 - **Hint / 提示:** Shows the first words of the replies you can give. 显示可用回答的前几个词。
 - **Retry / 再说:** Say your line again. If the script is asking “Did you mean …?”, Retry cancels that guess. 再讲一次；如果正在确认，就取消这次猜测。
-- **Leave / 离开:** **Esc** or **Leave**. The group goes back to its own ambient chat. Esc also closes the chooser, settings, and the help card. Esc 也会关闭选择列表、设置和帮助。
-- **Settings / 设置:** The gear button. Read-aloud on/off, an English voice, speaking speed, 3D subtitle bubbles, **中文翻译**, and a difficulty preference. Saved in `localStorage`. 齿轮按钮：朗读、英语语音、语速、立体字幕、中文翻译、难度偏好，都存在本地。
+- **Leave / 离开:** **Esc** or **Leave**. The group goes back to its own ambient chat. Esc also closes the chooser, practice, notebook, settings, and the help card. Starting or leaving a conversation closes the chooser too. Esc 也会关闭选择列表、跟读、笔记本、设置和帮助。开始或离开对话时，选择列表会关掉。
+- **Listen & Repeat / 跟读练习:** At the end of a chat, each useful phrase has **Practice**. The notebook has the same button. The app reads the line with your voice and speed settings (`speechSynthesis`). Hold **Space** or **Hold to speak**, or type the line if there is no microphone. Matched words turn green, missed words turn red, and you get a star rating. 对话结束或在笔记本里点 Practice。应用按你的语音和语速朗读，然后你按住说话或打字。对上的词是绿色，没对上的是红色，并给出星级。
+- **Notebook / 笔记本:** **N** or the book button. Useful phrases from a finished chat are saved automatically. **☆** on an NPC line or a reply saves that line too. Each entry shows Chinese (when we have it), where it came from, how many times you practiced it, and your best score. You can practice or delete it. Saved in `localStorage`. 按 N 或笔记本按钮。完成对话后的好用句子会自动记下，聊天里点 ☆ 也能保存。
+- **Daily missions / 每日任务:** Three missions for the local day, chosen from a fixed pool (for example a beginner cafe chat, three voice replies, a new 1-on-1, two listen-and-repeat phrases, or an intermediate chat). A small panel shows progress. Finishing one shows a toast and a short burst of confetti. Progress resets the next local day. A streak counts days you clear all three. 每天三个任务，进度在左侧。完成时有提示和一点彩纸。第二天重置，连续完成会记天数。
+- **Settings / 设置:** The gear button. Read-aloud on/off, an English voice, speaking speed, 3D subtitle bubbles, **中文翻译**, and a difficulty preference. Saved in `localStorage`. The same voice and speed are used for Listen & Repeat. 齿轮按钮：朗读、英语语音、语速、立体字幕、中文翻译、难度偏好，都存在本地。跟读练习用同一套语音和语速。
 - **Read aloud / 朗读:** Uses `speechSynthesis`. Off by default. The header checkbox and the settings panel stay in sync. 默认关闭。顶栏和设置面板是同一个开关。
 - **中文翻译:** Off by default. When it is on, each NPC line and each reply choice shows Chinese underneath. 默认关闭。打开后，每句 NPC 台词和每个回答选项下面都会显示中文。
 - **Minimap / 小地图:** Top-right. Zones, group anchors, other people, and you.
@@ -47,8 +50,10 @@ Push-to-talk uses the browser Web Speech API (`SpeechRecognition` / `webkitSpeec
 - `src/world/` — plaza zones, props, entrance signs.
 - `src/avatars/` — procedural bodies, idle/walk, emotes, speech bubbles.
 - `src/input/` — keyboard (`event.code`, with `event.key` fallback), mouse orbit, touch stick, speech.
-- `src/ui/hud.js` — zone, chat log, choices, mic state, chooser, settings.
-- `src/dialogue/` — engine, providers, and `match.js`.
+- `src/ui/hud.js` — zone, chat log, choices, mic state, chooser, settings, notebook, practice, daily missions.
+- `src/dialogue/` — engine, providers, and `match.js` (reply scores and listen-and-repeat word alignment).
+- `src/progress/` — notebook and daily missions (`localStorage`).
+- `src/world/ambience.js` — day sky, clouds, park leaves, cafe steam.
 - `src/data/` — characters, the conversation catalog, legacy Chinese lines, and zone scripts in `src/data/zones/`.
 
 ## Dialogue architecture / 对话架构
@@ -62,9 +67,13 @@ Push-to-talk uses the browser Web Speech API (`SpeechRecognition` / `webkitSpeec
 
 A `Turn` is `{ npcLines, choices, ended, reaction?, phrases?, heard?, confirm? }`. NPC lines and choices may include `zh`. `heard` is `{ input, match, confidence }` when a reply was scored. The HUD never reads the script files itself.
 
-The live provider is `ScriptedProvider`. It walks the graphs in `src/data/` and scores typed or spoken text with `match.js`. Each zone group has two or three joinable chats (beginner and intermediate), each about four to six turns, with two or three choices.
+The plaza uses a daytime sky, a few clouds, falling leaves in the park, and steam above the cafe machine. NPCs sometimes check a phone or stretch while they stand. These are cheap meshes and sprites, not a weather system.
 
-当前用的是 `ScriptedProvider`。四个区域各有两三段可加入的小组对话，分初级和中级，每段大约四到六个回合，每回合两到三个选项。一对一脚本和新人物的数据在 `src/data/zones/`。
+广场是白天的天空，有几朵云、公园里落下的叶子，以及咖啡机上的热气。站着的人物偶尔会看手机或伸个懒腰。这些都是很少的面片，不是天气系统。
+
+The live provider is `ScriptedProvider`. It walks the graphs in `src/data/` and scores typed or spoken text with `match.js`. Each zone group has two or three joinable chats (beginner and intermediate), each about four to six turns, with two or three choices. Listen & Repeat uses the same `normalize` path to mark each word.
+
+当前用的是 `ScriptedProvider`。四个区域各有两三段可加入的小组对话，分初级和中级，每段大约四到六个回合，每回合两到三个选项。一对一脚本和新人物的数据在 `src/data/zones/`。跟读练习用同一套 `normalize` 给每个词上色。
 
 `AIProvider` (`src/dialogue/AIProvider.js`) is an unwired stub. To plug in a real model later:
 
@@ -78,7 +87,10 @@ The live provider is `ScriptedProvider`. It walks the graphs in `src/data/` and 
 
 `window.__sim` (for headless checks):
 
-- `getState()` → `{ zone, playerPos, nearby, inConversation, conversationId, lastNpcLine, choices, confirming, chooserOpen, settings }`
+- `getState()` → `{ zone, playerPos, nearby, inConversation, conversationId, lastNpcLine, choices, confirming, chooserOpen, practiceOpen, notebookOpen, settings }`
+- `notebook.list()` / `notebook.add({ text, zh, source })` / `notebook.remove(id)`
+- `missions.get()` → `{ date, streak, missions: [{ id, title, titleZh, progress, goal, done }] }`
+- `practice(phraseText)` opens Listen & Repeat for that line
 - `teleportTo(zoneOrGroupId)` — `cafe`, `park`, `classroom` / `class`, `shop`, `plaza`, or an NPC id
 - `listConversations(zone)` → `{ id, title, level, zone }[]` for that zone (`cafe`, `park`, `classroom` / `class`, `shop`). An empty zone lists every group chat.
 - `joinConversation(id)` — starts that group chat, or a 1-on-1 when `id` is a character id
