@@ -14,6 +14,7 @@ export function createHUD() {
   const micBtn = document.querySelector('#mic-btn');
   const transcriptEl = document.querySelector('#transcript');
   const typingEl = document.querySelector('#typing');
+  const yourTurnEl = document.querySelector('#your-turn');
   const waitEl = document.querySelector('#wait-hint');
   const endBox = document.querySelector('#end-box');
   const statsEl = document.querySelector('#stats');
@@ -382,6 +383,7 @@ export function createHUD() {
       endBox.classList.add('hidden');
       hintsEl.classList.add('hidden');
       hintsEl.innerHTML = '';
+      setYourTurn(false);
     }
     hintBtn.classList.toggle('hidden', !show);
     retryBtn.classList.toggle('hidden', !show);
@@ -462,6 +464,12 @@ export function createHUD() {
 
   function setTyping(on) {
     typingEl.classList.toggle('hidden', !on);
+  }
+
+  function setYourTurn(on) {
+    if (!yourTurnEl) return;
+    yourTurnEl.classList.toggle('hidden', !on);
+    chatEl.classList.toggle('your-turn', !!on);
   }
 
   function setWaiting(on) {
@@ -931,6 +939,7 @@ export function createHUD() {
     addLog,
     setChoices,
     setTyping,
+    setYourTurn,
     setWaiting,
     showEnd,
     setStats,

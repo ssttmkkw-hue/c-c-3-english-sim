@@ -121,6 +121,20 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   font-size: 18px;
   margin: 0 0 6px;
 }
+#your-turn {
+  margin: 4px 0 8px;
+  color: #e1f5fe;
+  font-size: 15px;
+  text-shadow: 0 0 12px rgba(128, 216, 255, 0.9);
+  animation: your-turn-glow 2.4s ease-in-out infinite;
+}
+@keyframes your-turn-glow {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+#chat.your-turn {
+  box-shadow: 0 0 0 2px rgba(128, 216, 255, 0.45), 0 0 18px rgba(128, 216, 255, 0.28);
+}
 #wait-hint { margin: 6px 0; color: #ffe082; font-size: 14px; }
 #end-box { margin: 8px 0; }
 #end-box p { margin: 0 0 8px; font-weight: 700; }

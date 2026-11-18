@@ -333,11 +333,14 @@ export function animateAvatar(avatar, dt, moving, speed, state) {
     avatar.mouth.scale.y = open;
   }
   if (avatar.ring) {
-    const on = !!state.speaking;
+    const cue = !!state.cue && !state.speaking;
+    const on = !!state.speaking || !!state.cue;
     avatar.ring.visible = on;
     if (on) {
-      const pulse = 1 + Math.sin(state.phase * 5) * 0.08;
+      const pulse = 1 + Math.sin(state.phase * (cue ? 3 : 5)) * (cue ? 0.12 : 0.08);
       avatar.ring.scale.set(pulse, pulse, 1);
+      avatar.ring.material.color.setHex(cue ? 0xffe082 : 0x80d8ff);
+      avatar.ring.material.opacity = cue ? 0.62 : 0.45;
     }
   }
 }

@@ -11,7 +11,7 @@ export function createPlayer(colliders) {
     look: { hair: 'short', hairColor: 0x3e2723, outfit: 'shirt' },
   });
   avatar.root.position.set(0, 0, 0);
-  const anim = { phase: 0, react: null, reactT: 0 };
+  const anim = { phase: 0, react: null, reactT: 0, cue: false };
   const radius = 0.45;
 
   function canStand(x, z, bodies) {
@@ -53,12 +53,20 @@ export function createPlayer(colliders) {
     animateAvatar(avatar, dt, moving, speed, anim);
   }
 
+  function tick(dt) {
+    animateAvatar(avatar, dt, false, 0, anim);
+  }
+
   return {
     avatar,
     update,
+    tick,
     radius,
     react(kind) {
       triggerReact(anim, kind);
+    },
+    setCue(on) {
+      anim.cue = !!on;
     },
     applyLook(look) {
       const next = look || {};

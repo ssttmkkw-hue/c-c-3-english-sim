@@ -12,9 +12,10 @@ import { createNPC } from './avatars/npc.js';
 import { createKeyboard } from './input/keyboard.js';
 import { createPointer } from './input/pointer.js';
 import { createTouch } from './input/touch.js';
-import { createSpeechInput, speakLine, stopSpeaking } from './input/speech.js';
+import { createSpeechInput, setAmbientMuted, speakLine, stopSpeaking } from './input/speech.js';
 import { createHUD } from './ui/hud.js';
 import { DialogueEngine } from './dialogue/DialogueEngine.js';
+import { createSceneDirector } from './dialogue/SceneDirector.js';
 import { ScriptedProvider } from './dialogue/ScriptedProvider.js';
 import { alignPhrase, normalize } from './dialogue/match.js';
 import { createNotebook } from './progress/notebook.js';
@@ -55,12 +56,65 @@ for (const [groupId, zoneKey] of Object.entries(GROUP_ZONE)) {
     id: groupId,
     zone,
     members: npcs.filter((npc) => npc.def.group === groupId),
-    lines: AMBIENT[zone.ambient],
-    index: 0,
-    timer: 1.5 + Math.random(),
-    paused: false,
+    scenes: AMBIENT[zone.ambient],
     recent: [],
+    director: null,
   };
+}
+
+const WELCOME_LINE = { text: 'Oh, hi! Join us.', zh: '哦，你好！一起来吧。' };
+const FAREWELL_LINE = { text: 'Nice talking with you. See you around.', zh: '聊得很开心。回头见。' };
+const PATIENCE_LINE = { text: 'Take your time.', zh: '慢慢来。' };
+const asideDirectors = [];
+let timeScale = 1;
+
+function attachDirector(group, members, withScenes) {
+  return createSceneDirector({
+    ambient: !!withScenes,
+    getScenes: () => (withScenes && group ? group.scenes : []),
+    getMembers: () => members,
+    npcByName: (name) => byName.get(name) || null,
+    anchor: () => {
+      if (group && group.zone) return { x: group.zone.anchor[0], z: group.zone.anchor[1] };
+      const npc = members[0];
+      const p = npc ? npc.avatar.root.position : player.avatar.root.position;
+      return { x: p.x, z: p.z };
+    },
+    playerPos: () => {
+      const p = player.avatar.root.position;
+      return { x: p.x, z: p.z };
+    },
+    patienceLine: PATIENCE_LINE,
+    onLine(line, kind) {
+      if (group && (kind === 'ambient' || kind === 'visitor' || kind === 'farewell' || kind === 'welcome')) {
+        group.recent.push({ speaker: line.speaker, text: line.text, zh: line.zh || '' });
+        if (group.recent.length > 3) group.recent.shift();
+      }
+      if (!session) return;
+      if (kind !== 'dialogue' && kind !== 'welcome' && kind !== 'nudge') return;
+      const key = `${line.speaker}|${line.text}`;
+      if (kind === 'dialogue' && key === session.lastLineKey) return;
+      if (kind === 'dialogue') session.lastLineKey = key;
+      hud.addLog(line.speaker, line.text, 'npc', line.zh || '');
+      lastNpcLine = `${line.speaker}: ${line.text}`;
+      session.speaker = line.speaker;
+      session.lastSpoken = line.text;
+    },
+    onSpeak(line, kind) {
+      if (!hud.ttsEnabled()) return null;
+      const ambientKind = kind === 'ambient' || kind === 'visitor';
+      if (ambientKind) {
+        if (session) return null;
+        if (group && nearestSpeechGroup() !== group) return null;
+        return speakLine(line.text, voiceOf(line.speaker), { ...voiceOptions(), lane: 'ambient' });
+      }
+      return speakLine(line.text, voiceOf(line.speaker), { ...voiceOptions(), lane: 'foreground' });
+    },
+  });
+}
+
+for (const group of Object.values(groups)) {
+  group.director = attachDirector(group, group.members, true);
 }
 
 const keyboard = createKeyboard();
@@ -181,10 +235,6 @@ function refreshNotebook() {
   if (hud.notebookOpen()) hud.renderNotebook(notebook.list());
 }
 
-function wait(ms) {
-  return new Promise((resolve) => { setTimeout(resolve, ms); });
-}
-
 function voiceOf(name) {
   const npc = byName.get(name);
   return npc ? npc.def.voice : 0;
@@ -202,30 +252,47 @@ function applyTurn(turn, token, source) {
   playTurn(turn, token, source);
 }
 
+function syncYourTurn() {
+  if (!session) {
+    player.setCue(false);
+    return;
+  }
+  const director = sessionDirector();
+  const held = director ? director.snapshot().state === 'held' : false;
+  const waiting = !session.ended && !session.busy && choiceList.length > 0;
+  hud.setYourTurn(waiting && held);
+  player.setCue(waiting && held);
+  if (!director) return;
+  if (waiting) {
+    if (!session.patienceOn) {
+      session.patienceOn = true;
+      director.setPatience(true);
+    }
+  } else if (session.patienceOn) {
+    session.patienceOn = false;
+    director.setPatience(false);
+  }
+}
+
+function sessionDirector() {
+  if (!session) return null;
+  if (session.group && session.group.director) return session.group.director;
+  return session.soloDirector || null;
+}
+
 async function playTurn(turn, token, source) {
   if (!session || token !== playToken) return;
-  const lines = turn.npcLines || [];
+  const lines = (turn.npcLines || []).map((line, index) => ({
+    speaker: line.speaker,
+    text: line.text,
+    zh: line.zh || '',
+    to: 'player',
+    emote: index === 0 ? (turn.reaction || '') : '',
+  }));
   if (lines.length) hud.setTyping(true);
-  for (const line of lines) {
-    if (token !== playToken || !session) return;
-    const key = `${line.speaker}|${line.text}`;
-    if (key === session.lastLineKey) continue;
-    session.lastLineKey = key;
-    const npc = byName.get(line.speaker);
-    for (const other of npcs) {
-      if (other !== npc) other.silence(now);
-    }
-    if (npc) {
-      npc.say(line.text, now);
-      npc.react(turn.reaction || 'nod');
-    }
-    hud.addLog(line.speaker, line.text, 'npc', line.zh || '');
-    lastNpcLine = `${line.speaker}: ${line.text}`;
-    session.speaker = line.speaker;
-    if (hud.ttsEnabled()) speakLine(line.text, voiceOf(line.speaker), voiceOptions());
-    session.lastSpoken = line.text;
-    await wait(Math.min(2800, 900 + line.text.length * 22));
-  }
+  const director = sessionDirector();
+  if (director && lines.length) await director.playLines(lines);
+  else if (director) director.holdForPlayer();
   if (token !== playToken || !session) return;
   if (turn.heard) {
     hud.addHeard(turn.heard);
@@ -282,6 +349,15 @@ function formCircle(members) {
   });
 }
 
+function groupForMembers(members) {
+  const grouped = members.find((npc) => npc.def.group && groups[npc.def.group]);
+  if (!grouped) return null;
+  const group = groups[grouped.def.group];
+  if (!group || !group.members.length) return null;
+  const same = members.every((npc) => npc.def.group === group.id);
+  return same ? group : null;
+}
+
 async function openConversation(conversationId, mode, members) {
   hud.setChooser(false);
   if (hud.practiceOpen()) hud.closePractice();
@@ -290,14 +366,18 @@ async function openConversation(conversationId, mode, members) {
   const token = playToken;
   const zone = zoneAt(player.avatar.root.position.x, player.avatar.root.position.z);
   const meta = GROUP_CONVERSATIONS.find((item) => item.id === conversationId);
+  const group = mode === 'group' ? groupForMembers(members) : null;
   session = {
     conversationId,
     mode,
     members,
+    group,
+    soloDirector: null,
     busy: true,
     ended: false,
     confirming: false,
     lastSpoken: '',
+    patienceOn: false,
     mission: {
       mode,
       zone: zone.id,
@@ -311,20 +391,32 @@ async function openConversation(conversationId, mode, members) {
       mode,
     },
   };
+  setAmbientMuted(true);
   if (mode === 'solo') refreshMissions(missions.noteSolo(session.mission.characterId));
-  for (const npc of members) {
-    if (npc.def.group && groups[npc.def.group]) groups[npc.def.group].paused = true;
-  }
   hud.setPrompt([]);
   hud.setActions({ join: null, talk: null });
   hud.setAmbient([]);
   hud.showChat(true);
-  formCircle(members);
   hud.showEnd(false);
   hud.setTyping(true);
   hud.setWaiting(false);
+  hud.setYourTurn(false);
   choiceList = [];
   pendingReply = null;
+  if (group) {
+    await group.director.requestJoin(WELCOME_LINE.text, WELCOME_LINE.zh);
+    if (token !== playToken || !session) return;
+    formCircle(members);
+  } else {
+    session.soloDirector = attachDirector(null, members, false);
+    const home = members.find((npc) => npc.def.group && groups[npc.def.group]);
+    if (home) {
+      session.suspendedGroup = groups[home.def.group];
+      await session.suspendedGroup.director.suspend();
+      if (token !== playToken || !session) return;
+    }
+  }
+  if (token !== playToken || !session) return;
   const turn = engine.start(session.context);
   if (turn && typeof turn.then === 'function') turn.then((value) => applyTurn(value, token, 'script'));
   else applyTurn(turn, token, 'script');
@@ -334,15 +426,24 @@ function closeConversation() {
   hud.setChooser(false);
   if (!session) return;
   playToken += 1;
-  for (const npc of session.members) {
-    if (npc.def.group && groups[npc.def.group]) groups[npc.def.group].paused = false;
+  const closing = session;
+  for (const npc of closing.members) {
     npc.clearGoal();
     npc.clearLook();
   }
   choiceList = [];
   pendingReply = null;
   session = null;
+  player.setCue(false);
+  hud.setYourTurn(false);
+  setAmbientMuted(false);
   stopSpeaking();
+  if (closing.group && closing.group.director) {
+    closing.group.director.requestFarewell(FAREWELL_LINE.text, FAREWELL_LINE.zh);
+  } else if (closing.soloDirector) {
+    closing.soloDirector.requestFarewell(FAREWELL_LINE.text, FAREWELL_LINE.zh);
+    asideDirectors.push({ director: closing.soloDirector, release: closing.suspendedGroup || null });
+  }
   if (micHeld) {
     speech.stop();
     micHeld = false;
@@ -391,7 +492,7 @@ function openPractice(text, zh) {
   if (!phrase) return false;
   practicePhrase = { text: phrase, zh: zh || zhFor(phrase) };
   hud.openPractice(practicePhrase.text, practicePhrase.zh, speech.supported);
-  speakLine(practicePhrase.text, 0, voiceOptions());
+  speakLine(practicePhrase.text, 0, { ...voiceOptions(), lane: 'foreground', interrupt: true });
   return true;
 }
 
@@ -451,7 +552,7 @@ hud.onSave((text, zh) => {
 });
 hud.onPractice((text, zh) => openPractice(text, zh));
 hud.onPracticePlay(() => {
-  if (practicePhrase) speakLine(practicePhrase.text, 0, voiceOptions());
+  if (practicePhrase) speakLine(practicePhrase.text, 0, { ...voiceOptions(), lane: 'foreground', interrupt: true });
 });
 hud.onPracticeSubmit((text) => scorePractice(text));
 hud.onPracticeClose(() => {
@@ -476,7 +577,7 @@ hud.onRetry(() => {
   hud.setTranscript('');
   if (document.activeElement !== hud.sayEl) hud.sayEl.focus();
   if (hud.ttsEnabled() && session.lastSpoken) {
-    speakLine(session.lastSpoken, voiceOf(session.speaker), voiceOptions());
+    speakLine(session.lastSpoken, voiceOf(session.speaker), { ...voiceOptions(), lane: 'foreground', interrupt: true });
   }
 });
 
@@ -605,34 +706,30 @@ function nearestGroup(x, z) {
   return best;
 }
 
-function updateAmbient(dt, x, z) {
+function nearestSpeechGroup() {
+  const pos = player.avatar.root.position;
+  let best = null;
+  let bestDist = 12;
   for (const group of Object.values(groups)) {
-    if (group.paused) {
-      group.focus = null;
-      continue;
+    const dist = Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = group;
     }
-    group.timer -= dt;
-    if (group.timer > 0) continue;
-    let pause = 2.2 + Math.random() * 2.1;
-    if (Math.random() < 0.22) pause += 1.3 + Math.random() * 1.6;
-    group.timer = pause;
-    const line = group.lines[group.index % group.lines.length];
-    group.index += 1;
-    const npc = byName.get(line.speaker);
-    if (npc) {
-      npc.say(line.text, now);
-      npc.react(Math.random() < 0.8 ? 'nod' : 'wave');
-      const [ax, az] = group.zone.anchor;
-      npc.face(ax, az);
-      const p = npc.avatar.root.position;
-      const hold = Math.min(4.2, 1.6 + line.text.length * 0.035);
-      group.focus = { name: line.speaker, x: p.x, z: p.z, until: now + hold + 0.5 };
-    }
-    group.recent.push(line);
-    if (group.recent.length > 3) group.recent.shift();
-    if (hud.ttsEnabled() && !session) {
-      const near = Math.hypot(group.zone.anchor[0] - x, group.zone.anchor[1] - z) < 7;
-      if (near) speakLine(line.text, voiceOf(line.speaker), voiceOptions());
+  }
+  return best;
+}
+
+function updateAmbient(dt) {
+  setAmbientMuted(!!session);
+  for (const group of Object.values(groups)) group.director.tick(dt, now);
+  if (session && session.soloDirector) session.soloDirector.tick(dt, now);
+  for (let i = asideDirectors.length - 1; i >= 0; i--) {
+    const item = asideDirectors[i];
+    item.director.tick(dt, now);
+    if (item.director.isIdle()) {
+      if (item.release) item.release.director.resume();
+      asideDirectors.splice(i, 1);
     }
   }
 }
@@ -663,7 +760,7 @@ function updateVisitors(dt) {
     if (visit.phase === 'idle') {
       visit.timer -= dt;
       if (visit.timer > 0) continue;
-      const options = Object.values(groups).filter((group) => !group.paused);
+      const options = Object.values(groups).filter((group) => group.director.acceptsVisitors());
       if (!options.length) {
         visit.timer = 4;
         continue;
@@ -677,7 +774,7 @@ function updateVisitors(dt) {
       visit.group = group;
       visit.timer = 14;
     } else if (visit.phase === 'go') {
-      if (!visit.group || visit.group.paused) {
+      if (!visit.group || !visit.group.director.acceptsVisitors()) {
         endVisit(npc, visit, 8 + Math.random() * 6);
         continue;
       }
@@ -690,25 +787,49 @@ function updateVisitors(dt) {
         const text = typeof raw === 'string' ? raw : raw.text;
         const spot = npc.avatar.root.position;
         npc.setGoal(spot.x, spot.z, ax, az);
-        npc.say(text, now);
-        npc.react('wave');
         npc.face(ax, az);
-        visit.group.focus = { name: npc.def.name, x: spot.x, z: spot.z, until: now + 4.3 };
-        visit.group.recent.push({ speaker: npc.def.name, text, zh: (raw && raw.zh) || '' });
-        if (visit.group.recent.length > 3) visit.group.recent.shift();
-        visit.phase = 'talk';
-        visit.timer = 3.3 + Math.random() * 1.4;
+        npc.react('wave');
+        visit.line = { speaker: npc.def.name, text, zh: (raw && raw.zh) || '' };
+        visit.phase = 'waitGap';
+        visit.timer = 18;
+        visit.asked = false;
       } else if (visit.timer <= 0) {
         endVisit(npc, visit, 10 + Math.random() * 8);
       }
+    } else if (visit.phase === 'waitGap') {
+      if (!visit.group) {
+        endVisit(npc, visit, 8);
+        continue;
+      }
+      visit.timer -= dt;
+      if (!visit.group.director.acceptsVisitors()) {
+        if (visit.timer <= 0) {
+          visit.group.director.cancelVisitor(npc.def.name);
+          endVisit(npc, visit, 12 + Math.random() * 8);
+        }
+        continue;
+      }
+      if (!visit.asked) {
+        visit.asked = true;
+        const group = visit.group;
+        const line = visit.line;
+        group.director.requestVisitor(line).then((result) => {
+          if (visit.phase !== 'waitGap' || visit.group !== group) return;
+          if (!result) {
+            visit.asked = false;
+            return;
+          }
+          visit.phase = 'talk';
+          visit.timer = 2.4;
+        });
+      }
+      if (visit.timer <= 0 && visit.phase === 'waitGap') {
+        visit.group.director.cancelVisitor(npc.def.name);
+        endVisit(npc, visit, 16 + Math.random() * 12);
+      }
     } else if (visit.phase === 'talk') {
       visit.timer -= dt;
-      if (visit.group && visit.group.focus && visit.group.focus.name === npc.def.name) {
-        const spot = npc.avatar.root.position;
-        visit.group.focus.x = spot.x;
-        visit.group.focus.z = spot.z;
-      }
-      if (visit.timer <= 0 || !visit.group || visit.group.paused) {
+      if (visit.timer <= 0 || !visit.group) {
         endVisit(npc, visit, 16 + Math.random() * 16);
       }
     }
@@ -717,7 +838,7 @@ function updateVisitors(dt) {
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), 0.05) * timeScale;
   now += dt;
   const help = hud.uiLocked();
   const look = pointer.read();
@@ -778,9 +899,11 @@ function loop() {
     else if (locked && session.center) npc.face(session.center.x, session.center.z);
   }
   updateVisitors(dt);
-  updateAmbient(dt, pos.x, pos.z);
+  updateAmbient(dt);
+  syncYourTurn();
+  if (session) player.tick(dt);
   ambience.update(dt);
-  applyLooks(speakerNpc, pos);
+  applyLooks();
 
   const zone = zoneAt(pos.x, pos.z);
   hud.setZone(zone.name);
@@ -897,25 +1020,19 @@ function loop() {
   renderer.render(scene, camera);
 }
 
-function applyLooks(speakerNpc, pos) {
-  const looked = new Set();
-  if (session) {
-    for (const npc of session.members) {
-      const target = speakerNpc && speakerNpc !== npc ? speakerNpc.avatar.root.position : pos;
-      npc.lookAt(target.x, target.z);
-      looked.add(npc);
-    }
-  }
+function applyLooks() {
+  const owned = new Set();
   for (const group of Object.values(groups)) {
-    if (group.paused || !group.focus || now > group.focus.until) continue;
-    for (const member of group.members) {
-      if (looked.has(member) || member.def.name === group.focus.name) continue;
-      member.lookAt(group.focus.x, group.focus.z);
-      looked.add(member);
-    }
+    for (const npc of group.director.gazeOwners()) owned.add(npc);
+  }
+  if (session && session.soloDirector) {
+    for (const npc of session.soloDirector.gazeOwners()) owned.add(npc);
+  }
+  for (const item of asideDirectors) {
+    for (const npc of item.director.gazeOwners()) owned.add(npc);
   }
   for (const npc of npcs) {
-    if (!looked.has(npc)) npc.clearLook();
+    if (!owned.has(npc)) npc.clearLook();
   }
 }
 
@@ -1020,7 +1137,7 @@ function fitBubble(npc) {
     spr.visible = false;
     return;
   }
-  if (now >= npc.bubbleUntil()) {
+  if (!npc.bubbleLive()) {
     spr.visible = false;
     return;
   }
@@ -1032,7 +1149,8 @@ function fitBubble(npc) {
   }
   spr.visible = true;
   const s = Math.min(2.5, Math.max(0.62, away * 0.24));
-  spr.scale.set(s * 1.15, s * 0.43, 1);
+  if (npc.bubbleKind() === 'back') spr.scale.set(s * 0.72, s * 0.28, 1);
+  else spr.scale.set(s * 1.15, s * 0.43, 1);
 }
 
 function drawMinimap(pos) {
@@ -1219,6 +1337,46 @@ window.__sim = {
     if (choice) submitText(choice.text, 'choice', choice.zh || '');
   },
   leave: closeConversation,
+  now: () => now,
+  getTimeScale: () => timeScale,
+  setTimeScale(value) {
+    const next = Number(value);
+    timeScale = Number.isFinite(next) ? Math.min(40, Math.max(0.25, next)) : 1;
+    return timeScale;
+  },
+  getDirector(groupId) {
+    const group = groups[groupId];
+    if (!group || !group.director) return null;
+    const snap = group.director.snapshot();
+    return {
+      state: snap.state,
+      speaker: snap.speaker,
+      lineId: snap.lineId,
+      sceneId: snap.sceneId,
+      overlapsDetected: snap.overlapsDetected,
+      backchannels: snap.backchannels,
+      visitorsPlayed: snap.visitorsPlayed,
+    };
+  },
+  mainBubbleOverlaps() {
+    return Object.values(groups).reduce((sum, group) => sum + group.director.overlaps(), 0);
+  },
+  requestVisitor(groupId, text) {
+    const group = groups[groupId];
+    if (!group) return Promise.resolve(false);
+    const wanderer = npcs.find((npc) => npc.def.wander);
+    const speaker = wanderer ? wanderer.def.name : group.members[0].def.name;
+    return group.director.requestVisitor({
+      speaker,
+      text: text || 'Mind if I listen in? I am practicing too.',
+      zh: '我可以旁听吗？我也在练习。',
+    });
+  },
+  bubbleOf(name) {
+    const npc = byName.get(name);
+    if (!npc) return null;
+    return { text: npc.bubbleText(), kind: npc.bubbleKind(), main: npc.isMainBubble() };
+  },
   chatWith(name) {
     const key = String(name || '').trim().toLowerCase();
     const npc = npcs.find((item) => item.def.name.toLowerCase() === key || item.def.id === key);
@@ -1229,6 +1387,14 @@ window.__sim = {
     if (npc.def.solo) openConversation(npc.def.solo, 'solo', [npc]);
   },
 };
+
+Object.defineProperty(window.__sim, 'timeScale', {
+  get() { return timeScale; },
+  set(value) {
+    const next = Number(value);
+    timeScale = Number.isFinite(next) ? Math.min(40, Math.max(0.25, next)) : 1;
+  },
+});
 
 const clock = new THREE.Clock();
 window.addEventListener('resize', () => {
