@@ -1,27 +1,31 @@
 import * as THREE from 'three';
 import { ZONES, WORLD_LIMIT } from './zones.js';
 import {
-  makeBench, makeChair, makeCounter, makeCup, makeDesk, makeFloor,
-  makeShelf, makeTable, makeTree, makeWhiteboard,
+  makeBench, makeChair, makeClock, makeClothesRack, makeCoffeeMachine, makeCounter,
+  makeCup, makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard,
+  makePlant, makePriceSign, makeShelf, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
 } from './props.js';
 
 export function createScene() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xb3e5fc);
-  scene.fog = new THREE.Fog(0xb3e5fc, 28, 62);
+  scene.background = new THREE.Color(0xc5e6f6);
+  scene.fog = new THREE.Fog(0xc5e6f6, 18, 52);
 
-  const hemi = new THREE.HemisphereLight(0xe3f2fd, 0x8d6e63, 0.75);
+  const hemi = new THREE.HemisphereLight(0xe7f4fc, 0x9a7b68, 0.92);
+  hemi.castShadow = false;
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff8e1, 1.15);
-  sun.position.set(12, 22, 8);
+  const sun = new THREE.DirectionalLight(0xfff6e4, 1.02);
+  sun.position.set(14, 24, 10);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 60;
-  sun.shadow.camera.left = -30;
-  sun.shadow.camera.right = 30;
-  sun.shadow.camera.top = 30;
-  sun.shadow.camera.bottom = -30;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.bias = -0.00035;
+  sun.shadow.normalBias = 0.035;
+  sun.shadow.camera.near = 2;
+  sun.shadow.camera.far = 52;
+  sun.shadow.camera.left = -26;
+  sun.shadow.camera.right = 26;
+  sun.shadow.camera.top = 26;
+  sun.shadow.camera.bottom = -26;
   scene.add(sun);
 
   const ground = new THREE.Mesh(
@@ -42,37 +46,59 @@ export function createScene() {
   const props = new THREE.Group();
   scene.add(props);
 
-  // Cafe
+  // Cafe — counter, machine, menu, plants, tables
   makeCounter(props, -20.2, -12, 7, 0, colliders, 0x6d4c41);
-  makeCup(props, -20.2, -10.6);
-  makeCup(props, -20.2, -13.4);
+  makeCoffeeMachine(props, -18.3, -12.05);
+  makeCup(props, -20.6, -11.75, 0.32);
+  makeCup(props, -21.5, -12.3, 0.32);
+  makeMenuBoard(props, -15.4, -9.4, Math.PI, colliders);
+  makePlant(props, -21.4, -20.6, colliders);
+  makePlant(props, -4.6, -20.4, colliders);
+  makePlant(props, -4.8, -5.2, colliders);
   makeTable(props, -7, -18, colliders);
   makeChair(props, -7, -17.2, 0);
   makeChair(props, -7.8, -18.6, Math.PI);
   makeTable(props, -16, -6.5, colliders, 0xbcaaa4);
   makeChair(props, -15.2, -6.5, Math.PI / 2);
 
-  // Park
+  // Park — trees, fountain, flowers, lamps, benches
   makeTree(props, 18.5, -18.5, colliders, 0x2e7d32);
   makeTree(props, 6.2, -19, colliders, 0x388e3c);
   makeTree(props, 20, -6.5, colliders, 0x43a047);
   makeTree(props, 7, -6, colliders, 0x1b5e20);
+  makeFountain(props, 17.2, -14.6, colliders);
+  makeFlowerBed(props, 9.4, -20.4, 0.2, colliders);
+  makeFlowerBed(props, 20.4, -10.2, 0.8, colliders);
+  makeLamp(props, 4.4, -4.4, colliders);
+  makeLamp(props, 21.2, -4.6, colliders);
+  makeLamp(props, 21.0, -21.2, colliders);
   makeBench(props, 8.5, -15.5, 0.4, colliders);
   makeBench(props, 16, -8, -0.6, colliders);
 
-  // Classroom
+  // Classroom — board, teacher desk, clock, three rows of desks
   makeWhiteboard(props, -12, 21.4);
   colliders.push({ x: -12, z: 21.2, r: 1.1 });
-  makeDesk(props, -16.5, 15.5, colliders);
-  makeDesk(props, -8, 15.5, colliders);
+  makeTeacherDesk(props, -19.4, 20.2, colliders);
+  makeClock(props, -5.6, 21.55, Math.PI);
+  makeDesk(props, -16.5, 13.1, colliders);
+  makeDesk(props, -12.2, 13.1, colliders);
+  makeDesk(props, -8, 13.1, colliders);
+  makeDesk(props, -16.5, 15.8, colliders);
+  makeDesk(props, -12.2, 15.8, colliders);
+  makeDesk(props, -8, 15.8, colliders);
   makeDesk(props, -16.5, 18.6, colliders);
+  makeDesk(props, -12.2, 18.6, colliders);
   makeDesk(props, -8, 18.6, colliders);
 
-  // Shop
+  // Shop — counter, shelves of boxes, clothes, price signs
   makeCounter(props, 12, 7.2, 6.5, 0, colliders, 0xef6c00);
   makeShelf(props, 7, 20.2, colliders);
   makeShelf(props, 12, 20.2, colliders);
   makeShelf(props, 17, 20.2, colliders);
+  makeShelf(props, 21.2, 16.4, colliders);
+  makeClothesRack(props, 19.6, 9.2, 0.4, colliders);
+  makePriceSign(props, 8.2, 17.2, 'Jacket', '$48', 0.4, colliders);
+  makePriceSign(props, 15.2, 8.4, 'Hat', '$12', -0.6, colliders);
 
   // Low walls at the world edge so the boundary reads clearly.
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.9 });

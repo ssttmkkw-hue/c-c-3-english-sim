@@ -18,26 +18,32 @@
   <canvas id="view"></canvas>
   <div id="hud">
     <header id="top">
-      <div id="zone-name">Plaza</div>
-      <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
-      <div id="stats">Practice stats: 0 conversations · 0 voice matches</div>
-      <label id="tts-label"><input type="checkbox" id="tts" /> Read lines aloud</label>
-      <button type="button" id="help-btn" title="Controls">?</button>
+      <div id="top-main">
+        <div id="zone-name">Plaza</div>
+        <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
+        <button type="button" id="help-btn" title="Controls">?</button>
+      </div>
+      <div id="top-extra">
+        <div id="stats">Practice stats: 0 conversations · 0 voice matches</div>
+        <label id="tts-label"><input type="checkbox" id="tts" /> <span class="tts-long">Read lines aloud</span><span class="tts-short">Speak</span></label>
+      </div>
     </header>
     <canvas id="minimap" width="160" height="160" aria-label="Minimap"></canvas>
     <div id="ambient" class="hidden"></div>
     <div id="prompt" class="hidden"></div>
     <section id="chat" class="hidden">
-      <div id="chat-log"></div>
-      <div id="typing" class="hidden" aria-hidden="true">…</div>
-      <div id="transcript" class="hidden"></div>
-      <p id="wait-hint" class="hidden">Wait for them to finish...</p>
-      <div id="choices"></div>
-      <div id="end-box" class="hidden">
-        <p>End of conversation</p>
-        <div id="end-actions">
-          <button type="button" id="leave-end">Leave</button>
-          <button type="button" id="talk-again">Talk again</button>
+      <div id="chat-scroll">
+        <div id="chat-log"></div>
+        <div id="typing" class="hidden" aria-hidden="true">…</div>
+        <div id="transcript" class="hidden"></div>
+        <p id="wait-hint" class="hidden">Wait for them to finish...</p>
+        <div id="choices"></div>
+        <div id="end-box" class="hidden">
+          <p>End of conversation</p>
+          <div id="end-actions">
+            <button type="button" id="leave-end">Leave</button>
+            <button type="button" id="talk-again">Talk again</button>
+          </div>
         </div>
       </div>
       <form id="say-form">
@@ -67,7 +73,7 @@
         <li>Reply with a choice, the text box, or hold Space / the mic button (点选项、打字，或按住空格/麦克风说话).</li>
         <li>Press 1 wave, 2 nod, 3 jump (1 挥手, 2 点头, 3 跳跃).</li>
         <li>Press Esc or Leave to step away (Esc 或 Leave 离开对话).</li>
-        <li>Press H or ? to open this list again (按 H 或 ? 再次打开说明).</li>
+        <li>Press H or ? to open or close this list (按 H 或 ? 打开或关闭说明). Esc or Got it also closes it (Esc 或知道了也会关闭).</li>
       </ul>
       <button type="button" id="help-close">Got it (知道了)</button>
     </div>

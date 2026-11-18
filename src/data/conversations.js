@@ -1,5 +1,19 @@
 /** Preset ambient loops and branching dialogues. Beginner–intermediate English. */
 
+/** Lines wandering visitors say when they stop beside a group. */
+export const VISITOR_LINES = {
+  rae: [
+    'Mind if I listen in? I am practicing too.',
+    'This spot is lively. What are you chatting about?',
+    'I will only stay a minute. Your English sounds clear.',
+  ],
+  eli: [
+    'Hi, can I listen for a minute? I want to hear the English.',
+    'I am still learning. Could you say that a little slower?',
+    'This group is helpful. I am picking up new words.',
+  ],
+};
+
 export const AMBIENT = {
   'cafe.ambient': [
     { speaker: 'Barista Tom', text: 'The lunch rush is quiet today. Can I pour anyone a refill?' },

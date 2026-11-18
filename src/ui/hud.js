@@ -33,6 +33,7 @@ export function createHUD() {
 
   function setHelp(show) {
     helpEl.classList.toggle('hidden', !show);
+    document.body.classList.toggle('help-open', !!show);
     if (!show) {
       try { localStorage.setItem(HELP_KEY, '1'); } catch (err) { /* private mode */ }
     }
@@ -84,14 +85,21 @@ export function createHUD() {
     talkBtn.textContent = talk || 'Talk';
   }
 
-  function setMic(state) {
+  let micState = 'idle';
+  let statConv = 0;
+  let statVoice = 0;
+
+  function narrowScreen() {
+    return window.matchMedia('(max-width: 520px)').matches;
+  }
+
+  function paintMic() {
+    const state = micState;
     micEl.dataset.state = state;
     micBtn.dataset.state = state;
-    const labels = {
-      idle: 'Mic idle',
-      listening: 'Mic listening',
-      unsupported: 'Mic unsupported',
-    };
+    const labels = narrowScreen()
+      ? { idle: 'Mic', listening: 'Live', unsupported: 'No mic' }
+      : { idle: 'Mic idle', listening: 'Mic listening', unsupported: 'Mic unsupported' };
     const buttonLabels = {
       idle: 'Hold to talk',
       listening: 'Listening…',
@@ -105,6 +113,11 @@ export function createHUD() {
       : 'Hold to talk. Works in Chrome or Edge on localhost or https.';
     micEl.title = tip;
     micBtn.title = tip;
+  }
+
+  function setMic(state) {
+    micState = state;
+    paintMic();
   }
 
   function setTranscript(text) {
@@ -182,8 +195,17 @@ export function createHUD() {
   }
 
   function setStats(conversations, voiceMatches) {
-    statsEl.textContent = `Practice stats: ${conversations} conversations · ${voiceMatches} voice matches`;
+    statConv = conversations;
+    statVoice = voiceMatches;
+    statsEl.textContent = narrowScreen()
+      ? `${conversations} chats · ${voiceMatches} voice`
+      : `Practice stats: ${conversations} conversations · ${voiceMatches} voice matches`;
   }
+
+  window.addEventListener('resize', () => {
+    paintMic();
+    setStats(statConv, statVoice);
+  });
 
   function helpOpen() {
     return !helpEl.classList.contains('hidden');

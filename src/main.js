@@ -3,7 +3,7 @@ import { createScene } from './world/scene.js';
 import { zoneAt } from './world/zones.js';
 import { ZONES } from './world/zones.js';
 import { CHARACTERS } from './data/characters.js';
-import { AMBIENT, GRAPHS } from './data/conversations.js';
+import { AMBIENT, GRAPHS, VISITOR_LINES } from './data/conversations.js';
 import { createPlayer } from './avatars/player.js';
 import { createNPC } from './avatars/npc.js';
 import { createKeyboard } from './input/keyboard.js';
@@ -20,6 +20,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const { scene, colliders } = createScene();
@@ -96,6 +97,10 @@ const camDesired = new THREE.Vector3();
 const lookDesired = new THREE.Vector3(0, 1.2, 0);
 const lookSmoothed = new THREE.Vector3(0, 1.2, 0);
 const bubbleAnchor = new THREE.Vector3();
+const tagAnchor = new THREE.Vector3();
+let camGain = 6.2;
+let aimBias = 0;
+let eatKey = '';
 saveStats();
 const mapCanvas = document.querySelector('#minimap');
 const mapCtx = mapCanvas.getContext('2d');
@@ -255,6 +260,7 @@ function closeConversation() {
     micHeld = false;
   }
   hud.showChat(false);
+  hud.sayEl.blur();
   hud.setChoices([]);
   hud.setTyping(false);
   hud.setWaiting(false);
@@ -312,21 +318,48 @@ hud.micBtn.addEventListener('pointerdown', (event) => {
 hud.micBtn.addEventListener('pointerup', releaseMic);
 hud.micBtn.addEventListener('pointerleave', releaseMic);
 
+function keyName(event) {
+  if (event.code === 'Escape' || event.key === 'Escape') return 'esc';
+  if (event.code === 'KeyH' || event.key === 'h' || event.key === 'H' || event.key === '?') return 'help';
+  if (event.code === 'Space' || event.key === ' ') return 'space';
+  return '';
+}
+
 window.addEventListener('keydown', (event) => {
   if (event.repeat) return;
-  if (event.code === 'Space' && session && !keyboard.typing()) holdMic();
+  const name = keyName(event);
+  if (hud.helpOpen()) {
+    if (name === 'esc' || (name === 'help' && !keyboard.typing())) {
+      hud.setHelp(false);
+      eatKey = name;
+      event.preventDefault();
+    } else if (name === 'help') {
+      eatKey = 'help';
+      event.preventDefault();
+    }
+    return;
+  }
+  if (name === 'help' && !keyboard.typing()) {
+    hud.setHelp(true);
+    eatKey = 'help';
+    event.preventDefault();
+    return;
+  }
+  if (name === 'space' && session && !keyboard.typing()) holdMic();
 });
 window.addEventListener('keyup', (event) => {
-  if (event.code === 'Space') releaseMic();
-  if (event.code === 'Escape' || event.key === 'Escape') {
+  const name = keyName(event);
+  if (name === 'space') releaseMic();
+  if (eatKey && name === eatKey) {
+    eatKey = '';
+    return;
+  }
+  if (name === 'esc') {
     if (hud.helpOpen()) {
       hud.setHelp(false);
       return;
     }
     closeConversation();
-  }
-  if (!keyboard.typing() && (event.key === '?' || event.key === 'h' || event.key === 'H' || event.code === 'KeyH')) {
-    hud.setHelp(!hud.helpOpen());
   }
 });
 
@@ -348,18 +381,26 @@ function nearestGroup(x, z) {
 
 function updateAmbient(dt, x, z) {
   for (const group of Object.values(groups)) {
-    if (group.paused) continue;
+    if (group.paused) {
+      group.focus = null;
+      continue;
+    }
     group.timer -= dt;
     if (group.timer > 0) continue;
-    group.timer = 3.6;
+    let pause = 2.2 + Math.random() * 2.1;
+    if (Math.random() < 0.22) pause += 1.3 + Math.random() * 1.6;
+    group.timer = pause;
     const line = group.lines[group.index % group.lines.length];
     group.index += 1;
     const npc = byName.get(line.speaker);
     if (npc) {
       npc.say(line.text, now);
-      npc.react('nod');
+      npc.react(Math.random() < 0.8 ? 'nod' : 'wave');
       const [ax, az] = group.zone.anchor;
       npc.face(ax, az);
+      const p = npc.avatar.root.position;
+      const hold = Math.min(4.2, 1.6 + line.text.length * 0.035);
+      group.focus = { name: line.speaker, x: p.x, z: p.z, until: now + hold + 0.5 };
     }
     group.recent.push(line);
     if (group.recent.length > 3) group.recent.shift();
@@ -370,33 +411,124 @@ function updateAmbient(dt, x, z) {
   }
 }
 
+const visits = new Map();
+
+function endVisit(npc, visit, delay) {
+  npc.clearGoal();
+  visit.phase = 'idle';
+  visit.group = null;
+  visit.timer = delay;
+}
+
+function updateVisitors(dt) {
+  for (const npc of npcs) {
+    if (!npc.def.wander) continue;
+    let visit = visits.get(npc);
+    if (!visit) {
+      visit = { phase: 'idle', timer: 3.5 + Math.random() * 6, group: null };
+      visits.set(npc, visit);
+    }
+    if (session && session.members.includes(npc)) {
+      visit.phase = 'idle';
+      visit.group = null;
+      visit.timer = 5;
+      continue;
+    }
+    if (visit.phase === 'idle') {
+      visit.timer -= dt;
+      if (visit.timer > 0) continue;
+      const options = Object.values(groups).filter((group) => !group.paused);
+      if (!options.length) {
+        visit.timer = 4;
+        continue;
+      }
+      const group = options[Math.floor(Math.random() * options.length)];
+      const [ax, az] = group.zone.anchor;
+      const ang = Math.random() * Math.PI * 2;
+      const stand = 2.55 + Math.random() * 0.4;
+      npc.setGoal(ax + Math.sin(ang) * stand, az + Math.cos(ang) * stand, ax, az);
+      visit.phase = 'go';
+      visit.group = group;
+      visit.timer = 14;
+    } else if (visit.phase === 'go') {
+      if (!visit.group || visit.group.paused) {
+        endVisit(npc, visit, 8 + Math.random() * 6);
+        continue;
+      }
+      visit.timer -= dt;
+      const [ax, az] = visit.group.zone.anchor;
+      const nearGroup = npc.distanceTo(ax, az) < 4.1;
+      if (npc.goalDistance() < 0.45 || (visit.timer <= 0 && nearGroup)) {
+        const lines = VISITOR_LINES[npc.def.id] || VISITOR_LINES.rae;
+        const text = lines[Math.floor(Math.random() * lines.length)];
+        const spot = npc.avatar.root.position;
+        npc.setGoal(spot.x, spot.z, ax, az);
+        npc.say(text, now);
+        npc.react('wave');
+        npc.face(ax, az);
+        visit.group.focus = { name: npc.def.name, x: spot.x, z: spot.z, until: now + 4.3 };
+        visit.group.recent.push({ speaker: npc.def.name, text });
+        if (visit.group.recent.length > 3) visit.group.recent.shift();
+        visit.phase = 'talk';
+        visit.timer = 3.3 + Math.random() * 1.4;
+      } else if (visit.timer <= 0) {
+        endVisit(npc, visit, 10 + Math.random() * 8);
+      }
+    } else if (visit.phase === 'talk') {
+      visit.timer -= dt;
+      if (visit.group && visit.group.focus && visit.group.focus.name === npc.def.name) {
+        const spot = npc.avatar.root.position;
+        visit.group.focus.x = spot.x;
+        visit.group.focus.z = spot.z;
+      }
+      if (visit.timer <= 0 || !visit.group || visit.group.paused) {
+        endVisit(npc, visit, 16 + Math.random() * 16);
+      }
+    }
+  }
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
   now += dt;
+  const help = hud.helpOpen();
   const look = pointer.read();
-  yaw -= look.dx * 0.005;
-  pitch = Math.min(1.2, Math.max(0.25, pitch + look.dy * 0.003));
-  dist = Math.min(9, Math.max(3.2, dist + look.wheel * 0.45));
+  if (!help) {
+    yaw -= look.dx * 0.005;
+    pitch = Math.min(1.2, Math.max(0.25, pitch + look.dy * 0.003));
+    dist = Math.min(9, Math.max(3.2, dist + look.wheel * 0.45));
+  }
 
-  if (!keyboard.typing()) {
+  if (help) {
+    keyboard.consume('Digit1');
+    keyboard.consume('Digit2');
+    keyboard.consume('Digit3');
+    keyboard.consume('KeyE');
+    keyboard.consume('KeyF');
+    keyboard.consume('Space');
+  } else if (!keyboard.typing()) {
     if (keyboard.consume('Digit1')) player.react('wave');
     if (keyboard.consume('Digit2')) player.react('nod');
     if (keyboard.consume('Digit3')) player.react('jump');
   }
 
   if (!session && !keyboard.typing()) {
-    let ix = touch.vector.x;
-    let iz = touch.vector.y;
-    if (keyboard.heldAny('KeyA', 'ArrowLeft')) ix -= 1;
-    if (keyboard.heldAny('KeyD', 'ArrowRight')) ix += 1;
-    if (keyboard.heldAny('KeyW', 'ArrowUp')) iz -= 1;
-    if (keyboard.heldAny('KeyS', 'ArrowDown')) iz += 1;
+    let ix = 0;
+    let iz = 0;
+    if (!help) {
+      ix = touch.vector.x;
+      iz = touch.vector.y;
+      if (keyboard.heldAny('KeyA', 'ArrowLeft')) ix -= 1;
+      if (keyboard.heldAny('KeyD', 'ArrowRight')) ix += 1;
+      if (keyboard.heldAny('KeyW', 'ArrowUp')) iz -= 1;
+      if (keyboard.heldAny('KeyS', 'ArrowDown')) iz += 1;
+    }
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
     const moveX = ix * cos + iz * sin;
     const moveZ = -ix * sin + iz * cos;
-    const run = keyboard.heldAny('ShiftLeft', 'ShiftRight');
+    const run = !help && keyboard.heldAny('ShiftLeft', 'ShiftRight');
     const bodies = npcs.map((npc) => ({
       x: npc.avatar.root.position.x,
       z: npc.avatar.root.position.z,
@@ -417,16 +549,13 @@ function loop() {
     npc.update(dt, now, locked, others);
     if (locked && session.mode === 'solo') npc.face(pos.x, pos.z);
     else if (locked && session.center) npc.face(session.center.x, session.center.z);
-    if (locked) {
-      const target = speakerNpc && speakerNpc !== npc ? speakerNpc.avatar.root.position : pos;
-      npc.lookAt(target.x, target.z);
-    } else npc.clearLook();
   }
+  updateVisitors(dt);
   updateAmbient(dt, pos.x, pos.z);
+  applyLooks(speakerNpc, pos);
 
   const zone = zoneAt(pos.x, pos.z);
   hud.setZone(zone.name);
-  updateNameTag();
 
   if (session && session.mode === 'group' && session.center) {
     const center = session.center;
@@ -436,9 +565,9 @@ function loop() {
     const alen = Math.hypot(ax, az) || 1;
     ax /= alen;
     az /= alen;
-    camDesired.set(pos.x + ax * 2.35, 2.25, pos.z + az * 2.35);
+    camDesired.set(pos.x + ax * 5.25, 2.72, pos.z + az * 5.25);
     const speak = speakerNpc ? speakerNpc.avatar.root.position : center;
-    lookDesired.set(speak.x * 0.72 + center.x * 0.28, 0.42, speak.z * 0.72 + center.z * 0.28);
+    lookDesired.set(center.x * 0.58 + speak.x * 0.42, 1.08, center.z * 0.58 + speak.z * 0.42);
   } else if (session && session.mode === 'solo' && session.members[0]) {
     const npos = session.members[0].avatar.root.position;
     player.avatar.root.rotation.y = Math.atan2(npos.x - pos.x, npos.z - pos.z);
@@ -455,8 +584,8 @@ function loop() {
     }
     sx *= session.sideSign;
     sz *= session.sideSign;
-    camDesired.set(pos.x - dx * 0.85 + sx * 2.7, 2.05, pos.z - dz * 0.85 + sz * 2.7);
-    lookDesired.set((pos.x + npos.x) * 0.5, 0.38, (pos.z + npos.z) * 0.5);
+    camDesired.set(pos.x - dx * 5.15 + sx * 0.85, 2.68, pos.z - dz * 5.15 + sz * 0.85);
+    lookDesired.set(pos.x * 0.42 + npos.x * 0.58, 1.06, pos.z * 0.42 + npos.z * 0.58);
   } else {
     const cosP = Math.cos(pitch);
     camDesired.set(
@@ -466,16 +595,25 @@ function loop() {
     );
     lookDesired.set(pos.x, 1.25, pos.z);
   }
+  separateCamera(camDesired);
+  const gainTarget = session ? 4.4 : 6.4;
+  camGain += (gainTarget - camGain) * (1 - Math.exp(-2.4 * dt));
+  const biasTarget = session ? 0.2 : 0;
+  aimBias += (biasTarget - aimBias) * (1 - Math.exp(-camGain * dt));
   if (!camera.userData.ready) {
     camera.position.copy(camDesired);
     lookSmoothed.copy(lookDesired);
     camera.userData.ready = true;
   } else {
-    const k = 1 - Math.exp(-7 * dt);
+    const k = 1 - Math.exp(-camGain * dt);
     camera.position.lerp(camDesired, k);
-    lookSmoothed.lerp(lookDesired, 1 - Math.exp(-4 * dt));
+    lookSmoothed.lerp(lookDesired, 1 - Math.exp(-3.4 * dt));
   }
+  separateCamera(camera.position);
   camera.lookAt(lookSmoothed);
+  if (aimBias > 0.001) camera.rotateX(-aimBias);
+  updateNameTag();
+  fitNameTags();
   for (const npc of npcs) fitBubble(npc);
 
   if (!session) {
@@ -501,14 +639,62 @@ function loop() {
     if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
       hud.setAmbient(group.recent.slice(-2));
     } else hud.setAmbient([]);
-    if (group && keyboard.consume('KeyE')) openConversation(group.zone.dialogue, 'group', group.members);
-    if (solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
+    if (!help && group && keyboard.consume('KeyE')) openConversation(group.zone.dialogue, 'group', group.members);
+    if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
     hud.joinBtn.onclick = () => { if (group) openConversation(group.zone.dialogue, 'group', group.members); };
     hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
   }
 
   drawMinimap(pos);
   renderer.render(scene, camera);
+}
+
+function applyLooks(speakerNpc, pos) {
+  const looked = new Set();
+  if (session) {
+    for (const npc of session.members) {
+      const target = speakerNpc && speakerNpc !== npc ? speakerNpc.avatar.root.position : pos;
+      npc.lookAt(target.x, target.z);
+      looked.add(npc);
+    }
+  }
+  for (const group of Object.values(groups)) {
+    if (group.paused || !group.focus || now > group.focus.until) continue;
+    for (const member of group.members) {
+      if (looked.has(member) || member.def.name === group.focus.name) continue;
+      member.lookAt(group.focus.x, group.focus.z);
+      looked.add(member);
+    }
+  }
+  for (const npc of npcs) {
+    if (!looked.has(npc)) npc.clearLook();
+  }
+}
+
+function separateCamera(point) {
+  const bodies = [player.avatar.root.position];
+  for (const npc of npcs) bodies.push(npc.avatar.root.position);
+  for (let pass = 0; pass < 2; pass++) {
+    for (const body of bodies) {
+      const yOnBody = Math.max(0.35, Math.min(1.8, point.y));
+      let dx = point.x - body.x;
+      let dy = point.y - yOnBody;
+      let dz = point.z - body.z;
+      let distBody = Math.hypot(dx, dy, dz);
+      if (distBody >= 1.2) continue;
+      if (distBody < 1e-4) {
+        dx = 0;
+        dy = 1;
+        dz = 0;
+        distBody = 1;
+      }
+      const push = 1.22 - distBody;
+      point.x += (dx / distBody) * push;
+      point.y += (dy / distBody) * push;
+      point.z += (dz / distBody) * push;
+    }
+  }
+  if (point.y < 0.85) point.y = 0.85;
 }
 
 function updateNameTag() {
@@ -525,9 +711,22 @@ function updateNameTag() {
     if (npc.distanceTo(p.x, p.z) < 1.7) near = true;
   }
   tag.position.y = near ? 2.62 : 2.15;
-  const s = near ? 1.05 : 1.7;
-  tag.scale.set(s, s * 0.25, 1);
   tag.material.opacity = near ? 0.45 : 1;
+  tag.userData.base = near ? 1.05 : 1.7;
+}
+
+function fitNameTags() {
+  fitSpriteTag(player.avatar.tag, player.avatar.root, player.avatar.tag.userData.base || 1.7);
+  for (const npc of npcs) fitSpriteTag(npc.avatar.tag, npc.avatar.root, 1.7);
+}
+
+function fitSpriteTag(tag, root, base) {
+  if (!tag || !tag.visible) return;
+  root.getWorldPosition(tagAnchor);
+  tagAnchor.y += tag.position.y;
+  const away = Math.max(0.75, tagAnchor.distanceTo(camera.position));
+  const s = Math.min(base, Math.max(0.34, away * 0.28));
+  tag.scale.set(s, s * 0.25, 1);
 }
 
 function fitBubble(npc) {
@@ -543,7 +742,7 @@ function fitBubble(npc) {
     return;
   }
   spr.visible = true;
-  const s = Math.min(4.6, Math.max(1.85, away * 0.27));
+  const s = Math.min(2.5, Math.max(0.62, away * 0.24));
   spr.scale.set(s * 1.15, s * 0.43, 1);
 }
 

@@ -26,6 +26,7 @@ export function createNPC(def, anchor, colliders) {
     baseZ: z,
     goal: null,
     look: null,
+    speaking: false,
   };
 
   function say(text, now) {
@@ -87,6 +88,7 @@ export function createNPC(def, anchor, colliders) {
   }
 
   function update(dt, now, paused, bodies) {
+    state.speaking = now < state.bubbleUntil;
     let moving = false;
     let speed = 0;
     if (state.goal) {
@@ -147,6 +149,11 @@ export function createNPC(def, anchor, colliders) {
     distanceTo(x, z) {
       const p = avatar.root.position;
       return Math.hypot(p.x - x, p.z - z);
+    },
+    goalDistance() {
+      if (!state.goal) return Infinity;
+      const p = avatar.root.position;
+      return Math.hypot(state.goal.x - p.x, state.goal.z - p.z);
     },
   };
 }

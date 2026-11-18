@@ -76,6 +76,13 @@ export function animateAvatar(avatar, dt, moving, speed, state) {
     avatar.armL.rotation.x = -swing * 0.2;
   }
 
+  if (state.speaking && !waving && state.react !== 'jump') {
+    const g = Math.sin(state.phase * 2.5);
+    avatar.body.position.y += 0.045 * Math.sin(state.phase * 2.15);
+    avatar.armR.rotation.x = -0.48 + g * 0.34;
+    avatar.armL.rotation.x = -0.16 + Math.sin(state.phase * 1.8) * 0.16;
+  }
+
   if (state.react === 'nod') {
     state.reactT -= dt;
     avatar.head.rotation.x = Math.sin(state.reactT * 14) * 0.4;

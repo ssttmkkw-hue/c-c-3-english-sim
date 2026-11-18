@@ -26,6 +26,14 @@ html, body {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  padding-right: 188px;
+  max-width: 100%;
+}
+#top-main, #top-extra {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 #zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn {
   background: rgba(16, 32, 39, 0.78);
@@ -46,6 +54,7 @@ html, body {
 #mic-state[data-state="listening"] { background: #c62828; }
 #mic-state[data-state="unsupported"] { background: #546e7a; }
 #tts-label { padding: 8px 12px; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+.tts-short { display: none; }
 #minimap {
   position: absolute;
   top: 16px;
@@ -81,12 +90,16 @@ html, body {
   width: min(640px, 100%);
   align-self: center;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: 42vh;
 }
-#chat-log {
-  max-height: 28vh;
+#chat-scroll {
   overflow: auto;
-  font-size: 15px;
+  min-height: 0;
+  max-height: 28vh;
 }
+#chat-log { font-size: 15px; }
 #chat-log p { margin: 0 0 8px; }
 #chat-log strong { margin-right: 6px; }
 #chat-log .you strong { color: #80d8ff; }
@@ -195,10 +208,30 @@ body.touch #touch { display: block; }
 }
 #touch-actions button { min-width: 140px; padding: 12px 14px; }
 body.touch:not(.chatting) #hud { padding-bottom: 168px; }
-body.touch.chatting #touch { bottom: auto; top: 38vh; height: 120px; }
+body.chatting #touch { display: none !important; }
 @media (max-width: 520px) {
   #hud { padding: 10px; }
-  #minimap { width: 96px; height: 96px; top: 10px; right: 10px; }
+  #top {
+    flex-direction: column;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding-right: 0;
+    max-width: calc(100vw - 108px);
+  }
+  #top-main, #top-extra { flex-wrap: nowrap; gap: 6px; max-width: 100%; }
+  #zone-name { padding: 6px 8px; font-size: 13px; }
+  #mic-state { padding: 6px 8px; font-size: 12px; }
+  #help-btn { width: 32px; height: 32px; }
+  #stats, #tts-label {
+    padding: 3px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .tts-long { display: none; }
+  .tts-short { display: inline; }
+  #minimap { width: 90px; height: 90px; top: 8px; right: 8px; }
+  #ambient { top: 76px; width: min(210px, 56vw); }
   #chat {
     width: 100%;
     position: fixed;
@@ -206,13 +239,21 @@ body.touch.chatting #touch { bottom: auto; top: 38vh; height: 120px; }
     right: 0;
     bottom: 0;
     border-radius: 16px 16px 0 0;
-    max-height: 46vh;
-    overflow: auto;
+    max-height: 40vh;
+    overflow: hidden;
   }
-  #chat-log { max-height: 18vh; }
-  body.touch.chatting #touch { top: auto; bottom: 47vh; }
+  #chat-scroll { max-height: none; flex: 1 1 auto; min-height: 0; }
+  #say { flex: 1 1 100%; min-width: 0; }
+  #say-form { flex-wrap: wrap; gap: 6px; }
+  #say-form button, #mic-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 6px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
   #touch-actions { right: 10px; bottom: 8px; }
   #touch-actions button { min-width: 112px; }
   #stick { left: 10px; width: 108px; height: 108px; }
-  #say-form button, #mic-btn { min-height: 44px; }
 }
