@@ -180,7 +180,7 @@ skit = createSkitPlayer({
   releaseFloor() {
     restoreCast();
     watchingShow = false;
-    seated = null;
+    if (seated) standUp();
     if (skitGroup) skitGroup.director.releaseFloor();
     skitGroup = null;
     stopSpeaking();
@@ -293,9 +293,39 @@ function sitDown(seat) {
   if (!show) return false;
   seated = seat;
   watchingShow = true;
-  player.avatar.root.position.set(seat.x, 0, seat.z);
-  player.avatar.root.rotation.y = Math.PI;
+  // Sit slightly toward the chair back (south, +Z) so the body is on the seat.
+  player.avatar.root.position.set(seat.x, 0, seat.z + 0.06);
+  player.setSit(true);
+  const zone = findZone('playhouse');
+  const stage = (zone && zone.stage) || { x: 0, z: 33 };
+  faceToward(stage.x, stage.z, true);
+  pitch = 0.2;
+  dist = 6.6;
   return skit.start(show.current.id, { theater: true });
+}
+
+function standUp() {
+  seated = null;
+  player.setSit(false);
+  player.avatar.root.position.y = 0;
+}
+
+/** Face a world point and put the camera behind the player. */
+function faceToward(tx, tz, snap) {
+  const pos = player.avatar.root.position;
+  const dx = tx - pos.x;
+  const dz = tz - pos.z;
+  if (Math.hypot(dx, dz) < 0.05) return;
+  player.avatar.root.rotation.y = Math.atan2(dx, dz);
+  yaw = player.avatar.root.rotation.y + Math.PI;
+  if (snap) camera.userData.ready = false;
+}
+
+function arriveInZone(zone, snap) {
+  const place = zone || zoneAt(player.avatar.root.position.x, player.avatar.root.position.z);
+  const target = (place && (place.lookAt || place.anchor)) || null;
+  if (!target) return;
+  faceToward(target[0], target[1], snap !== false);
 }
 
 function applaudAudience() {
@@ -1178,7 +1208,7 @@ function loop() {
   updateVisitors(dt);
   updateAmbient(dt);
   syncYourTurn();
-  if (session) player.tick(dt);
+  if (session || seated) player.tick(dt);
   ambience.update(dt);
   applyLooks();
 
@@ -1241,6 +1271,16 @@ function loop() {
     sz *= session.sideSign;
     camDesired.set(pos.x - dx * 5.15 + sx * 0.85, 2.68, pos.z - dz * 5.15 + sz * 0.85);
     lookDesired.set(pos.x * 0.42 + npos.x * 0.58, 1.06, pos.z * 0.42 + npos.z * 0.58);
+  } else if (seated) {
+    const zone = findZone('playhouse');
+    const stage = (zone && zone.stage) || { x: 0, z: 33 };
+    const behind = Math.max(5.4, dist);
+    camDesired.set(
+      pos.x + Math.sin(yaw) * behind,
+      2.42,
+      pos.z + Math.cos(yaw) * behind,
+    );
+    lookDesired.set(pos.x * 0.16 + stage.x * 0.84, 1.35, pos.z * 0.16 + stage.z * 0.84);
   } else {
     const cosP = Math.cos(pitch);
     camDesired.set(
@@ -1376,7 +1416,7 @@ function separateCamera(point) {
 function updateNameTag() {
   const tag = player.avatar.tag;
   if (!tag) return;
-  if (session) {
+  if (session || seated) {
     tag.visible = false;
     return;
   }
@@ -1646,6 +1686,7 @@ function fadeMove(x, z, during) {
     setTimeout(() => {
       player.avatar.root.position.set(x, 0, z);
       if (during) during();
+      if (!watchingShow) arriveInZone(zoneAt(x, z), true);
       if (el) el.classList.remove('on');
       setTimeout(resolve, 400);
     }, 400);
@@ -1688,6 +1729,7 @@ function teleportTo(zoneOrGroupId) {
     const dest = spawnOf(key);
     if (dest) {
       player.avatar.root.position.set(dest.x, 0, dest.z);
+      arriveInZone(findZone(key) || zoneAt(dest.x, dest.z), true);
       return;
     }
   }
@@ -1711,6 +1753,10 @@ window.__sim = {
     return {
       zone: zone.name,
       playerPos: { x: pos.x, y: pos.y, z: pos.z },
+      seated: seated ? { x: seated.x, z: seated.z } : null,
+      sitting: !!seated,
+      yaw,
+      facingY: player.avatar.root.rotation.y,
       nearby: nearNames,
       inConversation: !!session,
       conversationId: session ? session.conversationId : null,
@@ -1767,6 +1813,44 @@ window.__sim = {
     const seat = seats[Number(index) || 0] || seats[0];
     if (!seat) return false;
     return sitDown(seat);
+  },
+  debugView() {
+    const p = player.avatar.root;
+    const tag = player.avatar.tag;
+    const cam = camera.position;
+    const list = npcs.map((npc) => {
+      const r = npc.avatar.root;
+      return {
+        name: npc.def.name,
+        x: +r.position.x.toFixed(3),
+        y: +r.position.y.toFixed(3),
+        z: +r.position.z.toFixed(3),
+        rotY: +r.rotation.y.toFixed(3),
+        staged: staged.some((item) => item.npc === npc),
+      };
+    });
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    const tom = npcs.find((npc) => /Tom/.test(npc.def.name));
+    const nose = new THREE.Vector3();
+    let tomNose = null;
+    if (tom) {
+      const head = tom.avatar.head;
+      head.getWorldPosition(nose);
+      const forward = new THREE.Vector3(0, 0, 0.3).applyQuaternion(tom.avatar.root.getWorldQuaternion(new THREE.Quaternion()));
+      tomNose = {
+        head: { x: +nose.x.toFixed(3), y: +nose.y.toFixed(3), z: +nose.z.toFixed(3) },
+        fwd: { x: +forward.x.toFixed(3), y: +forward.y.toFixed(3), z: +forward.z.toFixed(3) },
+      };
+    }
+    return {
+      player: { x: +p.position.x.toFixed(3), y: +p.position.y.toFixed(3), z: +p.position.z.toFixed(3), rotY: +p.rotation.y.toFixed(3), sit: !!seated },
+      tag: tag ? { y: +tag.position.y.toFixed(3), visible: tag.visible, sx: +tag.scale.x.toFixed(3) } : null,
+      camera: { x: +cam.x.toFixed(3), y: +cam.y.toFixed(3), z: +cam.z.toFixed(3), yaw, dir: { x: +dir.x.toFixed(3), y: +dir.y.toFixed(3), z: +dir.z.toFixed(3) } },
+      tomNose,
+      staged: list.filter((item) => item.staged),
+      nearby: list.filter((item) => Math.hypot(item.x - p.position.x, item.z - p.position.z) < 12),
+    };
   },
   join: tryJoin,
   chat: tryChat,

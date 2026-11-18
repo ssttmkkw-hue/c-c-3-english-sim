@@ -265,21 +265,35 @@ export function setAvatarLook(avatar, { color, hair, name } = {}) {
 }
 
 export function animateAvatar(avatar, dt, moving, speed, state) {
-  state.phase = (state.phase || 0) + dt * (moving ? 8 + speed : 1.6);
-  const swing = moving ? Math.sin(state.phase) : 0;
-  const breathe = Math.sin(state.phase * (moving ? 1 : 1.35)) * (moving ? 0.02 : 0.018);
-  avatar.legL.rotation.x = swing * 0.75;
-  avatar.legR.rotation.x = -swing * 0.75;
-  avatar.body.position.y = (moving ? Math.abs(Math.sin(state.phase)) * 0.07 : 0) + breathe;
-
+  state.phase = (state.phase || 0) + dt * (moving && !state.sit ? 8 + speed : 1.6);
+  const swing = moving && !state.sit ? Math.sin(state.phase) : 0;
+  const breathe = Math.sin(state.phase * (moving && !state.sit ? 1 : 1.35)) * (moving && !state.sit ? 0.02 : 0.018);
   const posing = state.react === 'wave' || state.react === 'phone' || state.react === 'stretch';
-  if (!posing) {
-    avatar.armL.rotation.x = -swing * 0.55;
-    avatar.armR.rotation.x = swing * 0.55;
-    avatar.armL.rotation.z += (0 - avatar.armL.rotation.z) * 0.2;
-    avatar.armR.rotation.z += (0 - avatar.armR.rotation.z) * 0.2;
-  } else if (state.react === 'wave') {
-    avatar.armL.rotation.x = -swing * 0.2;
+
+  if (state.sit) {
+    avatar.body.position.y = -0.42 + breathe * 0.5;
+    avatar.body.position.z += (-0.05 - avatar.body.position.z) * 0.25;
+    avatar.legL.rotation.x = -1.15;
+    avatar.legR.rotation.x = -1.15;
+    if (!posing) {
+      avatar.armL.rotation.x = 0.28;
+      avatar.armR.rotation.x = 0.32;
+      avatar.armL.rotation.z += (0.1 - avatar.armL.rotation.z) * 0.2;
+      avatar.armR.rotation.z += (-0.1 - avatar.armR.rotation.z) * 0.2;
+    }
+  } else {
+    avatar.body.position.z += (0 - avatar.body.position.z) * 0.25;
+    avatar.legL.rotation.x = swing * 0.75;
+    avatar.legR.rotation.x = -swing * 0.75;
+    avatar.body.position.y = (moving ? Math.abs(Math.sin(state.phase)) * 0.07 : 0) + breathe;
+    if (!posing) {
+      avatar.armL.rotation.x = -swing * 0.55;
+      avatar.armR.rotation.x = swing * 0.55;
+      avatar.armL.rotation.z += (0 - avatar.armL.rotation.z) * 0.2;
+      avatar.armR.rotation.z += (0 - avatar.armR.rotation.z) * 0.2;
+    } else if (state.react === 'wave') {
+      avatar.armL.rotation.x = -swing * 0.2;
+    }
   }
 
   if (state.speaking && !posing && state.react !== 'jump') {

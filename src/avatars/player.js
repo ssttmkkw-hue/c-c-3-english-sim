@@ -68,6 +68,9 @@ export function createPlayer(colliders) {
     setCue(on) {
       anim.cue = !!on;
     },
+    setSit(on) {
+      anim.sit = !!on;
+    },
     applyLook(look) {
       const next = look || {};
       setAvatarLook(avatar, {
