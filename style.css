@@ -206,7 +206,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
 .set-row { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; font-size: 15px; }
 .set-row:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
 .set-row input[type="checkbox"] { margin-right: 8px; }
-#set-voice, #set-level {
+#set-voice, #set-level, #set-quality {
   font: inherit;
   border-radius: 8px;
   border: 0;

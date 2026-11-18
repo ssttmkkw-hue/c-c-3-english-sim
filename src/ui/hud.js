@@ -120,6 +120,7 @@ export function createHUD() {
       subtitles: source.subtitles !== false,
       zh: !!source.zh,
       difficulty: LEVELS.has(source.difficulty) ? source.difficulty : 'any',
+      quality: source.quality === 'low' ? 'low' : 'high',
     };
   }
 
@@ -139,6 +140,8 @@ export function createHUD() {
     setSubs.checked = settings.subtitles;
     setZh.checked = settings.zh;
     setLevel.value = settings.difficulty;
+    const qualityEl = document.querySelector('#set-quality');
+    if (qualityEl) qualityEl.value = settings.quality === 'low' ? 'low' : 'high';
     setRate.value = String(settings.rate);
     setRateVal.textContent = settings.rate.toFixed(2);
     document.body.classList.toggle('show-zh', settings.zh);
@@ -211,6 +214,11 @@ export function createHUD() {
   setSubs.addEventListener('change', () => setSettings({ subtitles: setSubs.checked }));
   setZh.addEventListener('change', () => setSettings({ zh: setZh.checked }));
   setLevel.addEventListener('change', () => setSettings({ difficulty: setLevel.value }));
+  const setQuality = document.querySelector('#set-quality');
+  if (setQuality) {
+    setQuality.value = settings.quality === 'low' ? 'low' : 'high';
+    setQuality.addEventListener('change', () => setSettings({ quality: setQuality.value }));
+  }
   setVoice.addEventListener('change', () => setSettings({ voiceURI: setVoice.value }));
   setRate.addEventListener('input', () => setSettings({ rate: Number(setRate.value) }));
 

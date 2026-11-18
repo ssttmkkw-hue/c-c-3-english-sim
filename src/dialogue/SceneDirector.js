@@ -793,12 +793,16 @@ export function createSceneDirector(options) {
     mode = 'aside';
     patience = false;
     return new Promise((resolve) => {
+      const prev = suspendResolve;
+      suspendResolve = () => {
+        if (prev) prev();
+        resolve();
+      };
       if (state === 'gap' || state === 'held') {
         arm(lastNow, 99999);
-        resolve();
+        settleSuspend();
         return;
       }
-      suspendResolve = resolve;
       clearTimeout(suspendTimer);
       suspendTimer = setTimeout(() => {
         state = 'gap';

@@ -26,7 +26,10 @@ import { createSkitPlayer } from './skits/SkitPlayer.js';
 
 const canvas = document.querySelector('#view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+function phoneLike() {
+  return window.innerWidth <= 560 || window.innerWidth < window.innerHeight;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, phoneLike() ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -50,7 +53,7 @@ const npcs = CHARACTERS.map((def) => {
   return npc;
 });
 const byName = new Map(npcs.map((npc) => [npc.def.name, npc]));
-const castGaps = missingCast(byName);
+const castGaps = missingCast(new Set(byName.keys()));
 if (castGaps.length) console.warn('Skit role has no avatar', castGaps);
 
 const groups = {};
@@ -133,6 +136,9 @@ const speech = createSpeechInput();
 const hud = createHUD();
 player.applyLook(hud.getAvatar());
 hud.onAvatarChange((look) => player.applyLook(look));
+hud.onSettingsChange(() => applyQuality());
+applyQuality();
+if (sun && phoneLike()) sun.shadow.mapSize.set(512, 512);
 const engine = new DialogueEngine(new ScriptedProvider(GRAPHS));
 const notebook = createNotebook();
 const missions = createMissions();
@@ -939,9 +945,39 @@ function nearestSpeechGroup() {
   return best;
 }
 
+function activeZoneIds() {
+  const here = zoneAt(player.avatar.root.position.x, player.avatar.root.position.z);
+  const ids = new Set([here.id]);
+  for (const id of here.neighbors || []) ids.add(id);
+  return ids;
+}
+
+let tickingGroups = [];
+
 function updateAmbient(dt) {
   setAmbientMuted(!!session);
-  for (const group of Object.values(groups)) group.director.tick(dt, now);
+  const ids = activeZoneIds();
+  const ticking = [];
+  for (const group of Object.values(groups)) {
+    const skitOwns = !!(skit && skit.active() && skitGroup === group);
+    const inSession = !!(session && session.members && session.members.some((npc) => group.members.includes(npc)));
+    const near = ids.has(group.zone.id) || skitOwns || inSession;
+    if (!near && !group.parked) {
+      group.parked = 'pending';
+      group.director.suspend().then(() => {
+        if (group.parked === 'pending') group.parked = true;
+      });
+    }
+    if (near || group.parked !== true) {
+      if (near && group.parked && !skitOwns) {
+        group.director.resume();
+        group.parked = false;
+      }
+      group.director.tick(dt, now);
+      ticking.push(group.id);
+    }
+  }
+  tickingGroups = ticking;
   if (session && session.soloDirector) session.soloDirector.tick(dt, now);
   for (let i = asideDirectors.length - 1; i >= 0; i--) {
     const item = asideDirectors[i];
@@ -979,7 +1015,8 @@ function updateVisitors(dt) {
     if (visit.phase === 'idle') {
       visit.timer -= dt;
       if (visit.timer > 0) continue;
-      const options = Object.values(groups).filter((group) => group.director.acceptsVisitors());
+      const live = activeZoneIds();
+      const options = Object.values(groups).filter((group) => live.has(group.zone.id) && group.director.acceptsVisitors());
       if (!options.length) {
         visit.timer = 4;
         continue;
@@ -1055,9 +1092,24 @@ function updateVisitors(dt) {
   }
 }
 
+let frameMs = 16;
+
+function applyQuality() {
+  const quality = hud.getSettings().quality === 'low' ? 'low' : 'high';
+  const cap = phoneLike() ? 1.5 : 2;
+  const ratio = quality === 'low' ? Math.min(1, cap) : Math.min(window.devicePixelRatio || 1, cap);
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  const shadows = quality !== 'low';
+  renderer.shadowMap.enabled = shadows;
+  if (sun) sun.castShadow = shadows;
+}
+
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.2) * timeScale;
+  const raw = Math.min(clock.getDelta(), 0.2);
+  frameMs += (raw * 1000 - frameMs) * 0.08;
+  const dt = raw * timeScale;
   now += dt;
   const help = hud.uiLocked();
   const look = pointer.read();
@@ -1109,8 +1161,12 @@ function loop() {
   const pos = player.avatar.root.position;
   const speakerNpc = session && session.speaker ? byName.get(session.speaker) : null;
   const bodyOf = (npc) => ({ x: npc.avatar.root.position.x, z: npc.avatar.root.position.z, r: 0.42 });
+  const liveZones = activeZoneIds();
   for (const npc of npcs) {
+    const home = zoneAt(npc.avatar.root.position.x, npc.avatar.root.position.z).id;
+    const onStage = staged.some((item) => item.npc === npc);
     const locked = session && session.members.includes(npc);
+    if (!liveZones.has(home) && !locked && !onStage) continue;
     const others = [{ x: pos.x, z: pos.z, r: player.radius }];
     for (const other of npcs) {
       if (other !== npc) others.push(bodyOf(other));
@@ -1477,7 +1533,7 @@ function orderedTalks(zoneId) {
 function nearestSkit(x, z) {
   let best = null;
   let bestDist = 4.4;
-  for (const spot of SKIT_SPOTS) {
+  for (const spot of skitSpots()) {
     const dist = Math.hypot(spot.x - x, spot.z - z);
     if (dist < bestDist) {
       bestDist = dist;
@@ -1725,6 +1781,16 @@ window.__sim = {
   },
   leave: closeConversation,
   now: () => now,
+  perf() {
+    return {
+      frameMs: Math.round(frameMs * 10) / 10,
+      fps: Math.round(1000 / Math.max(1, frameMs)),
+      pixelRatio: renderer.getPixelRatio(),
+      quality: hud.getSettings().quality,
+      activeZones: [...activeZoneIds()],
+      ticking: tickingGroups.slice(),
+    };
+  },
   getTimeScale: () => timeScale,
   setTimeScale(value) {
     const next = Number(value);
@@ -1766,7 +1832,7 @@ window.__sim = {
   startSkit: (id) => startSkit(id),
   skipToRoles: () => skit.skipToRoles(),
   skipLine: () => skit.skipLine(),
-  castCheck: () => missingCast(byName),
+  castCheck: () => missingCast(new Set(byName.keys())),
   pickRole: (role) => skit.pickRole(role),
   rehearse: (role) => skit.rehearse(role),
   skitSay: (text) => skit.skitSay(text, 'text'),
@@ -1816,7 +1882,7 @@ const clock = new THREE.Clock();
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  applyQuality();
 });
 window.addEventListener('touchstart', () => touch.show(), { once: true, passive: true });
 requestAnimationFrame(loop);
