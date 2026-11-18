@@ -316,7 +316,9 @@ function sitDown(seat) {
 function standUp() {
   seated = null;
   player.setSit(false);
-  player.avatar.root.position.y = 0;
+  const pos = player.avatar.root.position;
+  pos.y = 0;
+  pos.z -= 0.5;
 }
 
 /** Face a world point and put the camera behind the player. */
@@ -1981,6 +1983,7 @@ window.__sim = {
       linesSaid: state.linesSaid,
       ended: state.ended,
       private: !!state.private,
+      suggestFewer: !!state.suggestFewer,
       waiting: state.waiting,
       offerSkip: state.offerSkip,
       feedback: state.feedback,

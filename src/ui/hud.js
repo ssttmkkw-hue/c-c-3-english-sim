@@ -1052,11 +1052,14 @@ export function createHUD() {
       skitControls.append(skitButton('Leave', 'leave'));
       appendSkitSay('Say it your way');
     } else if (model.phase === 'curtain') {
+      const fewer = skitButton('Try with fewer hints', 'fewer');
+      if (model.suggestFewer) fewer.classList.add('on');
       skitControls.append(
         skitButton('Replay', 'replay'),
-        skitButton('Try with fewer hints', 'fewer'),
+        fewer,
         skitButton('Leave', 'leave'),
       );
+      if (model.suggestFewer) fewer.focus({ preventScroll: true });
     }
     paintSkitFlags(model);
   }

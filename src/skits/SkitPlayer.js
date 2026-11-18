@@ -113,6 +113,7 @@ export function createSkitPlayer(opts) {
   let heard = [];
   let fromTheater = false;
   let privateRun = false;
+  let suggestFewer = false;
   let floorReady = Promise.resolve();
 
   function pause(ms) {
@@ -169,6 +170,7 @@ export function createSkitPlayer(opts) {
       offerSkip,
       fromTheater,
       private: privateRun,
+      suggestFewer,
       heard: heard.slice(),
       subtitle,
       lastLine,
@@ -404,6 +406,7 @@ export function createSkitPlayer(opts) {
     ended = true;
     waiting = false;
     const total = playerBeats().length;
+    suggestFewer = total > 0 && linesSaid / total >= 0.75;
     feedback = privateRun
       ? `${linesSaid} lines spoken`
       : (linesSaid > 0
@@ -431,6 +434,7 @@ export function createSkitPlayer(opts) {
     offerSkip = false;
     fromTheater = false;
     privateRun = false;
+    suggestFewer = false;
     if (slow && opts.setSlow) opts.setSlow(false);
     slow = false;
     if (opts.yourTurn) opts.yourTurn(false);
@@ -449,6 +453,7 @@ export function createSkitPlayer(opts) {
     skit = next;
     privateRun = !!(options && options.private);
     fromTheater = !!(options && options.theater) && !privateRun;
+    suggestFewer = false;
     role = '';
     hintLevel = 0;
     linesSaid = 0;
