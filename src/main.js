@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { createScene } from './world/scene.js';
 import { createAmbience } from './world/ambience.js';
-import { zoneAt } from './world/zones.js';
-import { ZONES } from './world/zones.js';
+import { zoneAt, ZONES, zoneById as findZone, groupZoneMap, skitSpots, zoneList } from './world/zones.js';
 import { CHARACTERS } from './data/characters.js';
 import { AMBIENT, GRAPHS, VISITOR_LINES } from './data/conversations.js';
 import { GROUP_CONVERSATIONS } from './data/catalog.js';
@@ -20,7 +19,7 @@ import { ScriptedProvider } from './dialogue/ScriptedProvider.js';
 import { alignPhrase, normalize } from './dialogue/match.js';
 import { createNotebook } from './progress/notebook.js';
 import { createMissions } from './progress/missions.js';
-import { SKITS, SKIT_SPOTS, skitById, skitsInZone, groupIdForSkit, spotForSkit, missingCast } from './data/skits/index.js';
+import { SKITS, skitById, skitsInZone, groupIdForSkit, spotForSkit, missingCast } from './data/skits/index.js';
 import { createSkitPlayer } from './skits/SkitPlayer.js';
 // AIProvider in ./dialogue/AIProvider.js is an unwired stub (no API key).
 
@@ -32,12 +31,12 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const { scene, colliders } = createScene();
+const { scene, colliders, portalRings, sun } = createScene();
 const ambience = createAmbience(scene);
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 120);
 
 const zoneById = Object.fromEntries(ZONES.map((zone) => [zone.id, zone]));
-const GROUP_ZONE = { cafe: 'cafe', park: 'park', class: 'classroom', shop: 'shop' };
+const GROUP_ZONE = groupZoneMap();
 
 const player = createPlayer(colliders);
 scene.add(player.avatar.root);
@@ -148,8 +147,8 @@ skit = createSkitPlayer({
   render: (model) => hud.renderSkit(model),
   place(item) {
     const spot = spotForSkit(item.id);
-    if (!spot) return;
-    player.avatar.root.position.set(spot.x, 0, spot.z + 1.15);
+    if (!spot) return Promise.resolve();
+    return fadeMove(spot.x, spot.z + 1.15);
   },
   mute() { setAmbientMuted(true); },
   unmute() { if (!session) setAmbientMuted(false); },
@@ -756,6 +755,7 @@ window.addEventListener('keydown', (event) => {
       else if (hud.practiceOpen()) hud.closePractice();
       else if (hud.notebookOpen()) hud.setNotebook(false);
       else if (hud.settingsOpen()) hud.setSettingsOpen(false);
+      else if (hud.portalsOpen()) hud.setPortals(false);
       else hud.setChooser(false);
       eatKey = name;
       event.preventDefault();
@@ -803,6 +803,10 @@ window.addEventListener('keyup', (event) => {
     }
     if (hud.chooserOpen()) {
       hud.setChooser(false);
+      return;
+    }
+    if (hud.portalsOpen()) {
+      hud.setPortals(false);
       return;
     }
     if (skit && skit.active()) {
@@ -978,6 +982,7 @@ function loop() {
     keyboard.consume('KeyE');
     keyboard.consume('KeyF');
     keyboard.consume('KeyG');
+    keyboard.consume('KeyT');
     keyboard.consume('Space');
   } else if (!keyboard.typing()) {
     if (keyboard.consume('Digit1')) player.react('wave');
@@ -1110,6 +1115,15 @@ function loop() {
   updateNameTag();
   fitNameTags();
   for (const npc of npcs) fitBubble(npc);
+
+  if (!help && !keyboard.typing() && keyboard.consume('KeyT')) togglePortals();
+
+  for (const ring of portalRings) {
+    const spin = ring.userData.ring;
+    if (spin) spin.rotation.z = now * 0.7;
+    const glow = ring.userData.glow;
+    if (glow && glow.material) glow.material.opacity = 0.26 + Math.sin(now * 2.4) * 0.12;
+  }
 
   if (!session) {
     if (skit && skit.active()) {
@@ -1314,7 +1328,7 @@ function drawMinimap(pos) {
     mapCtx.fill();
   }
   mapCtx.fillStyle = '#5c6bc0';
-  for (const spot of SKIT_SPOTS) {
+  for (const spot of skitSpots()) {
     mapCtx.beginPath();
     mapCtx.arc(toX(spot.x), toY(spot.z), 3.2, 0, Math.PI * 2);
     mapCtx.fill();
@@ -1389,6 +1403,10 @@ function openChooser(group) {
   hud.showChooser([...talks, ...scenes], note);
 }
 
+hud.onTeleport((id) => { teleport(id); });
+document.querySelector('#portals-btn').addEventListener('click', () => togglePortals());
+document.querySelector('#btn-portals').addEventListener('click', () => togglePortals());
+
 hud.onPick((id) => {
   if (skitById(id)) startSkit(id);
   else joinConversation(id, true);
@@ -1457,17 +1475,59 @@ function tryChat() {
   if (solo) openConversation(solo.def.solo, 'solo', [solo]);
 }
 
-function teleportTo(zoneOrGroupId) {
-  const key = String(zoneOrGroupId || '').trim().toLowerCase();
-  if (key === 'plaza' || key === 'center') {
-    player.avatar.root.position.set(0, 0, 0);
+let fadeChain = Promise.resolve();
+
+function fadeMove(x, z, during) {
+  const el = document.querySelector('#fade');
+  const run = fadeChain.then(() => new Promise((resolve) => {
+    if (el) el.classList.add('on');
+    setTimeout(() => {
+      player.avatar.root.position.set(x, 0, z);
+      if (during) during();
+      if (el) el.classList.remove('on');
+      setTimeout(resolve, 400);
+    }, 400);
+  }));
+  fadeChain = run.then(() => {}, () => {});
+  return run;
+}
+
+function spawnOf(zoneOrId) {
+  const key = String(zoneOrId || '').trim().toLowerCase();
+  if (!key || key === 'plaza' || key === 'center') return { x: 0, z: 0 };
+  const zone = findZone(key) || ZONES.find((item) => item.name.toLowerCase() === key);
+  if (!zone) return null;
+  if (zone.spawn) return { x: zone.spawn[0], z: zone.spawn[1] };
+  if (zone.anchor) return { x: zone.anchor[0], z: zone.anchor[1] + 3.5 };
+  return null;
+}
+
+function togglePortals() {
+  if (hud.portalsOpen()) {
+    hud.setPortals(false);
     return;
   }
-  const zoneKey = GROUP_ZONE[key] || (key === 'classroom' ? 'classroom' : key);
-  const zone = zoneById[zoneKey] || ZONES.find((item) => item.name.toLowerCase() === key);
-  if (zone && zone.anchor) {
-    player.avatar.root.position.set(zone.anchor[0], 0, zone.anchor[1] + 3.5);
-    return;
+  hud.showPortals(zoneList().map((zone) => ({ id: zone.id, name: zone.name })));
+}
+
+async function teleport(zoneId) {
+  const dest = spawnOf(zoneId);
+  if (!dest) return false;
+  hud.setPortals(false);
+  if (skit && skit.active()) skit.leave();
+  if (session) closeConversation();
+  await fadeMove(dest.x, dest.z);
+  return true;
+}
+
+function teleportTo(zoneOrGroupId) {
+  const key = String(zoneOrGroupId || '').trim().toLowerCase();
+  if (key === 'plaza' || key === 'center' || findZone(key) || ZONES.some((item) => item.name.toLowerCase() === key)) {
+    const dest = spawnOf(key);
+    if (dest) {
+      player.avatar.root.position.set(dest.x, 0, dest.z);
+      return;
+    }
   }
   const npc = npcs.find((item) => item.def.id === key || item.def.name.toLowerCase() === key);
   if (npc) {
@@ -1515,6 +1575,19 @@ window.__sim = {
   },
   practice: (phraseText) => openPractice(phraseText),
   teleportTo,
+  teleport,
+  zones() {
+    return zoneList().map((zone) => ({
+      id: zone.id,
+      name: zone.name,
+      bounds: zone.minX == null ? null : { minX: zone.minX, maxX: zone.maxX, minZ: zone.minZ, maxZ: zone.maxZ },
+      spawn: zone.spawn || (zone.id === 'plaza' ? [0, 0] : null),
+      groupId: zone.groupId || null,
+      neighbors: zone.neighbors || [],
+      skitSpots: zone.skitSpots || [],
+    }));
+  },
+  openTeleport: togglePortals,
   join: tryJoin,
   chat: tryChat,
   listConversations,

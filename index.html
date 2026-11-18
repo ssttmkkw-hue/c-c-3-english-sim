@@ -22,6 +22,7 @@
         <div id="zone-name">Plaza</div>
         <div id="mic-state" data-state="idle" title="Hold Space or the mic button to talk. Speech recognition works in Chrome and Edge on localhost or https.">Mic idle</div>
         <button type="button" id="notebook-btn" title="Notebook (N)">📒</button>
+        <button type="button" id="portals-btn" title="Teleport (T)">Go</button>
         <button type="button" id="settings-btn" title="Settings">⚙</button>
         <button type="button" id="help-btn" title="Controls">?</button>
       </div>
@@ -69,8 +70,20 @@
     <div id="stick" aria-hidden="true"><div id="knob"></div></div>
     <div id="touch-actions">
       <button type="button" id="btn-join" class="hidden">Join</button>
+      <button type="button" id="btn-portals">Go</button>
       <button type="button" id="btn-skit" class="hidden">🎭 Skit</button>
       <button type="button" id="btn-talk" class="hidden">Talk</button>
+    </div>
+  </div>
+  <div id="fade" aria-hidden="true"></div>
+  <div id="portals" class="hidden">
+    <div id="portals-card">
+      <div class="card-head"><h2>Teleport (传送)</h2></div>
+      <div class="card-body">
+        <p id="portals-note">Pick a place. The world fades, then you arrive.</p>
+        <div id="portals-list"></div>
+      </div>
+      <div class="card-foot"><button type="button" id="portals-cancel">Cancel (取消)</button></div>
     </div>
   </div>
   <div id="chooser" class="hidden">
@@ -181,6 +194,7 @@
         <li>Drag to look around (拖动旋转镜头). Scroll to zoom (滚轮缩放).</li>
         <li>On a phone, use the joystick (手机用左下摇杆移动).</li>
         <li>Press E or Join near a group, then pick a chat and its level (靠近人群按 E 或 Join，再选择对话和难度). If someone is still talking, they finish the line, then welcome you. One person speaks at a time (别人说完再欢迎你。一次只有一个人说话).</li>
+        <li>Press T or Go to open the teleport menu (按 T 或 Go 打开传送). Glowing rings mark the portals. A short fade carries you to the place you pick (发光的环是传送门，画面淡出后再出现在目的地).</li>
         <li>When it is your turn, a soft glow says “Your turn — take your time.” There is no countdown. After a quiet moment someone may say “Take your time.” (轮到你时会轻轻提示，没有倒计时。安静一会儿后，可能会有人说“慢慢来”。)</li>
         <li>Press F or Talk for a 1-on-1 chat (按 F 或 Talk 一对一聊天).</li>
         <li>Near a 🎭 Skit spot, press G (or the Skit button) to watch a short scene, then take a role (靠近小剧场标记按 G，先看再扮演). Any real try counts. There is no fail.</li>

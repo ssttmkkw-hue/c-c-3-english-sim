@@ -1,10 +1,9 @@
 import * as THREE from 'three';
-import { ZONES, WORLD_LIMIT } from './zones.js';
-import { SKIT_SPOTS } from '../data/skits/index.js';
+import { ZONES, WORLD_LIMIT, portals, skitSpots } from './zones.js';
 import {
   makeBench, makeChair, makeClock, makeClothesRack, makeCoffeeMachine, makeCounter,
   makeCup, makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard,
-  makePlant, makePriceSign, makeShelf, makeSkitSpot, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
+  makePlant, makePortal, makePriceSign, makeShelf, makeSkitSpot, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
 } from './props.js';
 
 export function createScene() {
@@ -101,7 +100,9 @@ export function createScene() {
   makePriceSign(props, 8.2, 17.2, 'Jacket', '$48', 0.4, colliders);
   makePriceSign(props, 15.2, 8.4, 'Hat', '$12', -0.6, colliders);
 
-  for (const spot of SKIT_SPOTS) makeSkitSpot(props, spot.x, spot.z);
+  for (const spot of skitSpots()) makeSkitSpot(props, spot.x, spot.z);
+  const portalRings = [];
+  for (const ring of portals()) portalRings.push(makePortal(props, ring.x, ring.z));
 
   // Low walls at the world edge so the boundary reads clearly.
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.9 });
@@ -122,7 +123,7 @@ export function createScene() {
 
   addZoneSigns(scene);
 
-  return { scene, colliders };
+  return { scene, colliders, portalRings, sun };
 }
 
 function addZoneSigns(scene) {

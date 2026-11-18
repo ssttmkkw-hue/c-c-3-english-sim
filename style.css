@@ -18,7 +18,7 @@ html, body {
   justify-content: space-between;
   padding: 16px;
 }
-#top, #prompt, #ambient, #chat, #touch, #touch button, #say-form button, #say, #skit, #skit button, #skit input {
+#top, #prompt, #ambient, #chat, #touch, #touch button, #say-form button, #say, #skit, #skit button, #skit input, #portals-btn, #btn-portals {
   pointer-events: auto;
 }
 #top {
@@ -35,13 +35,13 @@ html, body {
   align-items: center;
   flex-wrap: wrap;
 }
-#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn, #settings-btn, #notebook-btn {
+#zone-name, #mic-state, #stats, #tts-label, #prompt, #ambient, #chat, #help-btn, #settings-btn, #notebook-btn, #portals-btn {
   background: rgba(16, 32, 39, 0.78);
   color: #fff;
   border-radius: 12px;
 }
 #stats { padding: 8px 12px; font-size: 13px; }
-#help-btn, #settings-btn, #notebook-btn {
+#help-btn, #settings-btn, #notebook-btn, #portals-btn {
   border: 0;
   width: 36px;
   height: 36px;
@@ -139,7 +139,17 @@ body.show-zh .zh { display: block; margin-top: 2px; }
 #end-box { margin: 8px 0; }
 #end-box p { margin: 0 0 8px; font-weight: 700; }
 #end-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-#chooser, #settings, #help, #practice, #notebook {
+#fade {
+  position: fixed;
+  inset: 0;
+  background: #0d1b24;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms linear;
+  z-index: 30;
+}
+#fade.on { opacity: 1; }
+#chooser, #settings, #help, #practice, #notebook, #portals {
   position: fixed;
   inset: 0;
   background: rgba(16, 32, 39, 0.45);
@@ -150,7 +160,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   z-index: 5;
   padding: 16px;
 }
-#help-card, #chooser-card, #settings-card, #practice-card, #notebook-card {
+#help-card, #chooser-card, #settings-card, #practice-card, #notebook-card, #portals-card {
   width: min(520px, 100%);
   background: #102027;
   color: #fff;
@@ -169,7 +179,10 @@ body.show-zh .zh { display: block; margin-top: 2px; }
 .card-head { padding: 16px 18px 8px; border-radius: 16px 16px 0 0; }
 .card-body { overflow: auto; min-height: 0; padding: 4px 18px 8px; }
 .card-foot { padding: 8px 18px 14px; border-radius: 0 0 16px 16px; }
-#help-card h2, #chooser-card h2, #settings-card h2, #practice-card h2, #notebook-card h2 { margin: 0; font-size: 20px; }
+#help-card h2, #chooser-card h2, #settings-card h2, #practice-card h2, #notebook-card h2, #portals-card h2 { margin: 0; font-size: 20px; }
+#portals-note { margin: 0 0 10px; color: #b2ebf2; }
+#portals-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+#portals-list button, #portals-cancel { width: 100%; text-align: left; }
 #chooser-note { margin: 0 0 10px; color: #ffe082; min-height: 0; }
 #chooser-note:empty { display: none; }
 #chooser-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -236,7 +249,7 @@ body.show-zh .zh { display: block; margin-top: 2px; }
   width: 100%;
   white-space: normal;
 }
-#choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close, #practice-actions button, #practice-form button, #notebook-close, .note-actions button {
+#choices button, #say-form button, #touch-actions button, #chooser-list button, #chooser-cancel, #settings-close, #practice-actions button, #practice-form button, #notebook-close, .note-actions button, #portals-list button, #portals-cancel {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;
@@ -312,7 +325,7 @@ body.chatting #touch { display: none !important; }
   #top-main, #top-extra { flex-wrap: nowrap; gap: 6px; max-width: 100%; }
   #zone-name { padding: 6px 8px; font-size: 13px; }
   #mic-state { padding: 6px 8px; font-size: 12px; }
-  #help-btn, #settings-btn, #notebook-btn { width: 32px; height: 32px; }
+  #help-btn, #settings-btn, #notebook-btn, #portals-btn { width: 32px; height: 32px; font-size: 12px; }
   #stats, #tts-label {
     padding: 3px 8px;
     font-size: 11px;

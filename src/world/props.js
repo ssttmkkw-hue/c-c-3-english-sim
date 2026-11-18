@@ -361,6 +361,42 @@ export function makePriceSign(group, x, z, title, price, rotY, colliders) {
   return g;
 }
 
+/** A glowing ring. No collider, so you can walk through it. */
+export function makePortal(group, x, z) {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.92, 0.07, 8, 28),
+    new THREE.MeshStandardMaterial({
+      color: 0x80deea,
+      emissive: 0x26c6da,
+      emissiveIntensity: 0.85,
+      roughness: 0.28,
+      metalness: 0.05,
+    })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.12;
+  g.add(ring);
+  const glow = new THREE.Mesh(
+    new THREE.RingGeometry(0.45, 0.82, 28),
+    new THREE.MeshBasicMaterial({
+      color: 0xb2ebf2,
+      transparent: true,
+      opacity: 0.38,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+  );
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = 0.14;
+  g.add(glow);
+  g.position.set(x, 0, z);
+  g.userData.ring = ring;
+  g.userData.glow = glow;
+  group.add(g);
+  return g;
+}
+
 /** A small stage spot with a readable "Skit" sign. No collider, so you can stand on it. */
 export function makeSkitSpot(group, x, z) {
   const g = new THREE.Group();

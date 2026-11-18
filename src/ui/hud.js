@@ -199,6 +199,7 @@ export function createHUD() {
       chooserEl.classList.add('hidden');
       notebookEl.classList.add('hidden');
       closePractice();
+      setPortals(false);
       fillVoices();
     }
     settingsEl.classList.toggle('hidden', !show);
@@ -212,6 +213,46 @@ export function createHUD() {
   setLevel.addEventListener('change', () => setSettings({ difficulty: setLevel.value }));
   setVoice.addEventListener('change', () => setSettings({ voiceURI: setVoice.value }));
   setRate.addEventListener('input', () => setSettings({ rate: Number(setRate.value) }));
+
+  const portalsEl = document.querySelector('#portals');
+  const portalsList = document.querySelector('#portals-list');
+  const portalsCancel = document.querySelector('#portals-cancel');
+  let onTeleport = () => {};
+
+  function portalsOpen() {
+    return portalsEl && !portalsEl.classList.contains('hidden');
+  }
+
+  function setPortals(show) {
+    if (!portalsEl) return;
+    portalsEl.classList.toggle('hidden', !show);
+    if (!show && portalsList) portalsList.innerHTML = '';
+  }
+
+  function showPortals(items) {
+    if (!portalsEl || !portalsList) return;
+    helpEl.classList.add('hidden');
+    document.body.classList.remove('help-open');
+    settingsEl.classList.add('hidden');
+    notebookEl.classList.add('hidden');
+    chooserEl.classList.add('hidden');
+    closePractice();
+    portalsList.innerHTML = '';
+    for (const item of items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = item.name;
+      button.dataset.zone = item.id;
+      button.addEventListener('click', () => {
+        setPortals(false);
+        onTeleport(item.id);
+      });
+      portalsList.appendChild(button);
+    }
+    portalsEl.classList.remove('hidden');
+  }
+
+  if (portalsCancel) portalsCancel.addEventListener('click', () => setPortals(false));
 
   function chooserOpen() {
     return !chooserEl.classList.contains('hidden');
@@ -228,6 +269,7 @@ export function createHUD() {
     settingsEl.classList.add('hidden');
     notebookEl.classList.add('hidden');
     closePractice();
+    setPortals(false);
     chooserNote.textContent = note || '';
     chooserList.innerHTML = '';
     let lastSection = '';
@@ -267,6 +309,7 @@ export function createHUD() {
     if (show) {
       settingsEl.classList.add('hidden');
       chooserEl.classList.add('hidden');
+      setPortals(false);
       notebookEl.classList.add('hidden');
       tipsEl.classList.add('hidden');
       closePractice();
@@ -529,7 +572,7 @@ export function createHUD() {
   }
 
   function uiLocked() {
-    return helpOpen() || settingsOpen() || chooserOpen() || practiceOpen() || notebookOpen();
+    return helpOpen() || settingsOpen() || chooserOpen() || practiceOpen() || notebookOpen() || portalsOpen();
   }
 
   function setChoices(choices) {
@@ -1121,6 +1164,10 @@ export function createHUD() {
     showChooser,
     setChooser,
     chooserOpen,
+    showPortals,
+    setPortals,
+    portalsOpen,
+    onTeleport(fn) { onTeleport = fn; },
     showHints,
     uiLocked,
     sayEl,

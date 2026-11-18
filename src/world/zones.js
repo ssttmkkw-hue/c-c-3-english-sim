@@ -1,5 +1,13 @@
-/** Plaza quadrants. Coordinates are X (east) and Z (south). */
+/** Plaza quadrants, plus islands reached by portal. X is east, Z is south. */
 export const WORLD_LIMIT = 23.2;
+
+export const PLAZA = {
+  id: 'plaza',
+  name: 'Plaza',
+  spawn: [0, 0],
+  portal: { x: 0, z: 0 },
+  neighbors: ['cafe', 'park', 'classroom', 'shop'],
+};
 
 export const ZONES = [
   {
@@ -8,8 +16,13 @@ export const ZONES = [
     minX: -23, maxX: -3, minZ: -23, maxZ: -3,
     floor: 0xc4a484,
     anchor: [-12, -13],
+    spawn: [-12, -9.5],
+    groupId: 'cafe',
     dialogue: 'cafe.join',
     ambient: 'cafe.ambient',
+    neighbors: ['park', 'classroom', 'plaza'],
+    portal: { x: -6.2, z: -6.2 },
+    skitSpots: [{ id: 'latte-for-mika', x: -10.2, z: -9.6 }],
   },
   {
     id: 'park',
@@ -17,8 +30,13 @@ export const ZONES = [
     minX: 3, maxX: 23, minZ: -23, maxZ: -3,
     floor: 0x66bb6a,
     anchor: [12, -12],
+    spawn: [12, -8.5],
+    groupId: 'park',
     dialogue: 'park.join',
     ambient: 'park.ambient',
+    neighbors: ['cafe', 'shop', 'plaza'],
+    portal: { x: 6.2, z: -6.2 },
+    skitSpots: [],
   },
   {
     id: 'classroom',
@@ -26,8 +44,13 @@ export const ZONES = [
     minX: -23, maxX: -3, minZ: 3, maxZ: 23,
     floor: 0x90caf9,
     anchor: [-12, 10],
+    spawn: [-12, 13.5],
+    groupId: 'class',
     dialogue: 'class.join',
     ambient: 'class.ambient',
+    neighbors: ['cafe', 'shop', 'plaza'],
+    portal: { x: -6.2, z: 6.2 },
+    skitSpots: [{ id: 'late-to-class', x: -9.4, z: 11.0 }],
   },
   {
     id: 'shop',
@@ -35,20 +58,77 @@ export const ZONES = [
     minX: 3, maxX: 23, minZ: 3, maxZ: 23,
     floor: 0xffcc80,
     anchor: [12, 13],
+    spawn: [12, 16.5],
+    groupId: 'shop',
     dialogue: 'shop.join',
     ambient: 'shop.ambient',
+    neighbors: ['park', 'classroom', 'plaza'],
+    portal: { x: 6.2, z: 6.2 },
+    skitSpots: [],
   },
 ];
+
+export function zoneById(id) {
+  const key = String(id || '').trim().toLowerCase();
+  if (key === 'class') return ZONES.find((zone) => zone.id === 'classroom') || null;
+  if (key === 'plaza' || key === 'center') return PLAZA;
+  return ZONES.find((zone) => zone.id === key || zone.groupId === key) || null;
+}
+
+export function zoneList() {
+  return [PLAZA, ...ZONES];
+}
+
+export function groupZoneMap() {
+  const map = {};
+  for (const zone of ZONES) {
+    if (zone.groupId) map[zone.groupId] = zone.id;
+  }
+  return map;
+}
+
+export function skitSpots() {
+  const spots = [];
+  for (const zone of ZONES) {
+    for (const spot of zone.skitSpots || []) spots.push({ ...spot, zone: zone.id });
+  }
+  return spots;
+}
+
+export function groupIdForZone(zoneId) {
+  const zone = zoneById(zoneId);
+  return (zone && zone.groupId) || '';
+}
+
+export function portals() {
+  const rings = [];
+  if (PLAZA.portal) rings.push({ zone: 'plaza', ...PLAZA.portal });
+  for (const zone of ZONES) {
+    if (zone.portal) rings.push({ zone: zone.id, ...zone.portal });
+  }
+  return rings;
+}
 
 export function zoneAt(x, z) {
   for (const zone of ZONES) {
     if (x >= zone.minX && x <= zone.maxX && z >= zone.minZ && z <= zone.maxZ) return zone;
   }
-  return { id: 'plaza', name: 'Plaza', dialogue: null, ambient: null, anchor: [0, 0] };
+  return { id: 'plaza', name: 'Plaza', dialogue: null, ambient: null, anchor: [0, 0], neighbors: PLAZA.neighbors };
+}
+
+function insideIsland(x, z, radius) {
+  for (const zone of ZONES) {
+    if (!zone.island) continue;
+    if (x >= zone.minX + radius && x <= zone.maxX - radius && z >= zone.minZ + radius && z <= zone.maxZ - radius) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function blocked(x, z, radius, colliders) {
-  if (Math.abs(x) > WORLD_LIMIT - radius || Math.abs(z) > WORLD_LIMIT - radius) return true;
+  const plaza = Math.abs(x) <= WORLD_LIMIT - radius && Math.abs(z) <= WORLD_LIMIT - radius;
+  if (!plaza && !insideIsland(x, z, radius)) return true;
   for (const c of colliders) {
     const dx = x - c.x;
     const dz = z - c.z;
