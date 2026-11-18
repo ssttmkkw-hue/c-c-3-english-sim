@@ -20,6 +20,8 @@ import { ScriptedProvider } from './dialogue/ScriptedProvider.js';
 import { alignPhrase, normalize } from './dialogue/match.js';
 import { createNotebook } from './progress/notebook.js';
 import { createMissions } from './progress/missions.js';
+import { SKITS, SKIT_SPOTS, skitById, skitsInZone, groupIdForSkit, spotForSkit } from './data/skits/index.js';
+import { createSkitPlayer } from './skits/SkitPlayer.js';
 // AIProvider in ./dialogue/AIProvider.js is an unwired stub (no API key).
 
 const canvas = document.querySelector('#view');
@@ -85,7 +87,12 @@ function attachDirector(group, members, withScenes) {
       return { x: p.x, z: p.z };
     },
     patienceLine: PATIENCE_LINE,
+    getTiming() {
+      const settings = hud.getSettings();
+      return { rate: settings.rate };
+    },
     onLine(line, kind) {
+      if (skit && skit.active()) skit.onDirectorLine(line, kind);
       if (group && (kind === 'ambient' || kind === 'visitor' || kind === 'farewell' || kind === 'welcome')) {
         group.recent.push({ speaker: line.speaker, text: line.text, zh: line.zh || '' });
         if (group.recent.length > 3) group.recent.shift();
@@ -128,6 +135,73 @@ const engine = new DialogueEngine(new ScriptedProvider(GRAPHS));
 const notebook = createNotebook();
 const missions = createMissions();
 const zhIndex = buildZhIndex(GRAPHS);
+
+let skit = null;
+let skitGroup = null;
+let skitBaseScale = 1;
+
+skit = createSkitPlayer({
+  getSkit: skitById,
+  zhOn: () => hud.getSettings().zh,
+  render: (model) => hud.renderSkit(model),
+  place(item) {
+    const spot = spotForSkit(item.id);
+    if (!spot) return;
+    player.avatar.root.position.set(spot.x, 0, spot.z + 1.15);
+  },
+  mute() { setAmbientMuted(true); },
+  unmute() { if (!session) setAmbientMuted(false); },
+  claimFloor(item) {
+    const group = groups[groupIdForSkit(item)];
+    skitGroup = group || null;
+    if (!group) return Promise.resolve();
+    return group.director.suspend();
+  },
+  playLines(lines) {
+    if (!skitGroup) return Promise.resolve();
+    return skitGroup.director.playLines(lines);
+  },
+  cancelLines() {
+    if (skitGroup) skitGroup.director.cancelPlayback();
+    stopSpeaking();
+  },
+  releaseFloor() {
+    if (skitGroup) skitGroup.director.releaseFloor();
+    skitGroup = null;
+    stopSpeaking();
+  },
+  stopSpeak() { stopSpeaking(); },
+  speak(text) {
+    speakLine(text, 0, { ...voiceOptions(), lane: 'foreground', interrupt: true });
+  },
+  armPatience() {
+    if (!skitGroup) return;
+    skitGroup.director.holdForPlayer();
+    skitGroup.director.setPatience(true);
+  },
+  calmPatience() {
+    if (skitGroup) skitGroup.director.setPatience(false);
+  },
+  yourTurn(on) { player.setCue(!!on); },
+  setSlow(on) {
+    if (on) {
+      skitBaseScale = timeScale;
+      timeScale = Math.min(40, Math.max(0.25, skitBaseScale * 0.8));
+    } else {
+      timeScale = skitBaseScale;
+    }
+  },
+  savePhrases(item) {
+    const source = `Skit: ${item.title}`;
+    for (const phrase of item.keyPhrases || []) {
+      const text = typeof phrase === 'string' ? phrase : phrase && phrase.text;
+      if (!text) continue;
+      const zh = typeof phrase === 'object' && phrase.zh ? phrase.zh : '';
+      notebook.add({ text, zh, source, conversationId: item.id });
+    }
+  },
+  applause(text) { hud.celebrate(text); },
+});
 
 let yaw = 2.2;
 let pitch = 0.55;
@@ -359,6 +433,7 @@ function groupForMembers(members) {
 }
 
 async function openConversation(conversationId, mode, members) {
+  if (skit && skit.active()) skit.leave();
   hud.setChooser(false);
   if (hud.practiceOpen()) hud.closePractice();
   if (session) return;
@@ -581,9 +656,14 @@ hud.onRetry(() => {
   }
 });
 
+function skitWantsMic() {
+  if (!skit || !skit.active()) return false;
+  const state = skit.state();
+  return !!state.waiting && (state.phase === 'perform' || state.phase === 'rehearse');
+}
 function holdMic() {
   const practicing = hud.practiceOpen();
-  if ((!practicing && !session) || !speech.supported || micHeld) return;
+  if ((!practicing && !session && !skitWantsMic()) || !speech.supported || micHeld) return;
   micHeld = true;
   speech.start();
 }
@@ -594,6 +674,13 @@ function releaseMic() {
   if (hud.practiceOpen()) {
     if (text) scorePractice(text);
     return;
+  }
+  if (skit && skit.active()) {
+    const state = skit.state();
+    if (state.phase === 'perform' || state.phase === 'rehearse') {
+      if (text) skit.skitSay(text, 'voice');
+      return;
+    }
   }
   if (text) submitText(text, 'voice');
 }
@@ -608,6 +695,15 @@ function bindHold(button) {
 }
 bindHold(hud.micBtn);
 bindHold(hud.practiceMicBtn);
+document.querySelector('#skit').addEventListener('pointerdown', (event) => {
+  if (event.target && event.target.id === 'skit-mic') {
+    event.preventDefault();
+    holdMic();
+  }
+});
+document.querySelector('#skit').addEventListener('pointerup', releaseMic);
+document.querySelector('#skit').addEventListener('pointerleave', releaseMic);
+document.querySelector('#skit').addEventListener('pointercancel', releaseMic);
 
 function keyName(event) {
   if (event.code === 'Escape' || event.key === 'Escape') return 'esc';
@@ -652,7 +748,7 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     return;
   }
-  if (name === 'space' && session && !keyboard.typing()) holdMic();
+  if (name === 'space' && !keyboard.typing() && (session || skitWantsMic())) holdMic();
 });
 window.addEventListener('keyup', (event) => {
   const name = keyName(event);
@@ -684,6 +780,10 @@ window.addEventListener('keyup', (event) => {
     }
     if (hud.chooserOpen()) {
       hud.setChooser(false);
+      return;
+    }
+    if (skit && skit.active()) {
+      skit.leave();
       return;
     }
     closeConversation();
@@ -854,6 +954,7 @@ function loop() {
     keyboard.consume('Digit3');
     keyboard.consume('KeyE');
     keyboard.consume('KeyF');
+    keyboard.consume('KeyG');
     keyboard.consume('Space');
   } else if (!keyboard.typing()) {
     if (keyboard.consume('Digit1')) player.react('wave');
@@ -988,32 +1089,46 @@ function loop() {
   for (const npc of npcs) fitBubble(npc);
 
   if (!session) {
-    const group = nearestGroup(pos.x, pos.z);
-    let solo = null;
-    let soloDist = 2.55;
-    for (const npc of npcs) {
-      if (!npc.def.solo) continue;
-      const d = npc.distanceTo(pos.x, pos.z);
-      if (d < soloDist) {
-        soloDist = d;
-        solo = npc;
+    if (skit && skit.active()) {
+      keyboard.consume('KeyG');
+      keyboard.consume('KeyE');
+      keyboard.consume('KeyF');
+      hud.setPrompt([]);
+      hud.setActions({ join: null, talk: null, skit: null });
+      hud.setAmbient([]);
+    } else {
+      const group = nearestGroup(pos.x, pos.z);
+      let solo = null;
+      let soloDist = 2.55;
+      for (const npc of npcs) {
+        if (!npc.def.solo) continue;
+        const d = npc.distanceTo(pos.x, pos.z);
+        if (d < soloDist) {
+          soloDist = d;
+          solo = npc;
+        }
       }
+      const spot = nearestSkit(pos.x, pos.z);
+      const lines = [];
+      if (group) lines.push('Press E to choose a conversation');
+      if (spot) lines.push('Press G to watch a skit');
+      if (solo) lines.push(`Press F to chat 1-on-1 with ${solo.def.name}`);
+      hud.setPrompt(lines);
+      hud.setActions({
+        join: group ? 'Choose conversation' : null,
+        talk: solo ? 'Talk 1-on-1' : null,
+        skit: spot ? '🎭 Skit' : null,
+      });
+      if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
+        hud.setAmbient(group.recent.slice(-2));
+      } else hud.setAmbient([]);
+      if (!help && group && keyboard.consume('KeyE')) openChooser(group);
+      if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
+      if (!help && spot && keyboard.consume('KeyG')) startSkit(spot.id);
+      hud.joinBtn.onclick = () => { if (group) openChooser(group); };
+      hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
+      hud.skitBtn.onclick = () => { if (spot) startSkit(spot.id); };
     }
-    const lines = [];
-    if (group) lines.push('Press E to choose a conversation');
-    if (solo) lines.push(`Press F to chat 1-on-1 with ${solo.def.name}`);
-    hud.setPrompt(lines);
-    hud.setActions({
-      join: group ? 'Choose conversation' : null,
-      talk: solo ? 'Talk 1-on-1' : null,
-    });
-    if (group && Math.hypot(group.zone.anchor[0] - pos.x, group.zone.anchor[1] - pos.z) < 15) {
-      hud.setAmbient(group.recent.slice(-2));
-    } else hud.setAmbient([]);
-    if (!help && group && keyboard.consume('KeyE')) openChooser(group);
-    if (!help && solo && keyboard.consume('KeyF')) openConversation(solo.def.solo, 'solo', [solo]);
-    hud.joinBtn.onclick = () => { if (group) openChooser(group); };
-    hud.talkBtn.onclick = () => { if (solo) openConversation(solo.def.solo, 'solo', [solo]); };
   }
 
   drawMinimap(pos);
@@ -1175,6 +1290,12 @@ function drawMinimap(pos) {
     mapCtx.arc(toX(zone.anchor[0]), toY(zone.anchor[1]), 3.5, 0, Math.PI * 2);
     mapCtx.fill();
   }
+  mapCtx.fillStyle = '#5c6bc0';
+  for (const spot of SKIT_SPOTS) {
+    mapCtx.beginPath();
+    mapCtx.arc(toX(spot.x), toY(spot.z), 3.2, 0, Math.PI * 2);
+    mapCtx.fill();
+  }
   mapCtx.fillStyle = '#263238';
   for (const npc of npcs) {
     const p = npc.avatar.root.position;
@@ -1210,15 +1331,61 @@ function orderedTalks(zoneId) {
   return [...preferred, ...rest].map((item) => ({ ...item, preferred: item.level === pref }));
 }
 
-function openChooser(group) {
-  if (!group || session) return;
-  const items = orderedTalks(group.zone.id);
-  const pref = hud.getSettings().difficulty;
-  const note = pref === 'any' ? '' : `Your setting lists ${pref} chats first.`;
-  hud.showChooser(items, note);
+function nearestSkit(x, z) {
+  let best = null;
+  let bestDist = 4.4;
+  for (const spot of SKIT_SPOTS) {
+    const dist = Math.hypot(spot.x - x, spot.z - z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = spot;
+    }
+  }
+  return best;
 }
 
-hud.onPick((id) => { joinConversation(id, true); });
+function startSkit(id) {
+  if (session) closeConversation();
+  hud.setChooser(false);
+  if (hud.practiceOpen()) hud.closePractice();
+  return skit.start(id);
+}
+
+function openChooser(group) {
+  if (!group || session || (skit && skit.active())) return;
+  const talks = orderedTalks(group.zone.id).map((item) => ({ ...item, section: 'Conversations (对话)' }));
+  const scenes = skitsInZone(group.zone.id).map((item) => ({
+    id: item.id,
+    title: item.title,
+    level: item.level,
+    kind: 'skit',
+    section: 'Skits (小剧场)',
+  }));
+  const pref = hud.getSettings().difficulty;
+  const note = pref === 'any' ? '' : `Your setting lists ${pref} chats first.`;
+  hud.showChooser([...talks, ...scenes], note);
+}
+
+hud.onPick((id) => {
+  if (skitById(id)) startSkit(id);
+  else joinConversation(id, true);
+});
+
+hud.onSkit((action, extra) => {
+  if (!skit) return;
+  if (action === 'leave') skit.leave();
+  else if (action === 'replay') skit.replay();
+  else if (action === 'slow') skit.toggleSlow();
+  else if (action === 'words') skit.toggleWords();
+  else if (action === 'skip') skit.skipToRoles();
+  else if (action === 'perform') skit.pickRole(extra.role);
+  else if (action === 'rehearse') skit.rehearse(extra.role);
+  else if (action === 'hint') skit.setHint(extra.level);
+  else if (action === 'read') skit.tapRead();
+  else if (action === 'say') skit.skitSay(extra.text, 'text');
+  else if (action === 'skip-line') skit.skipLine();
+  else if (action === 'fewer') skit.fewerHints();
+});
 
 function tryJoin() {
   if (session) return;
@@ -1372,6 +1539,31 @@ window.__sim = {
       text: text || 'Mind if I listen in? I am practicing too.',
       zh: '我可以旁听吗？我也在练习。',
     });
+  },
+  listSkits() {
+    return SKITS.map(({ id, title, titleZh, level, zone }) => ({ id, title, titleZh, level, zone }));
+  },
+  startSkit: (id) => startSkit(id),
+  skipToRoles: () => skit.skipToRoles(),
+  pickRole: (role) => skit.pickRole(role),
+  rehearse: (role) => skit.rehearse(role),
+  skitSay: (text) => skit.skitSay(text, 'text'),
+  skitState() {
+    const state = skit.state();
+    return {
+      phase: state.phase,
+      beat: state.beat,
+      role: state.role,
+      hintLevel: state.hintLevel,
+      linesSaid: state.linesSaid,
+      ended: state.ended,
+      waiting: state.waiting,
+      feedback: state.feedback,
+      lastLine: state.lastLine,
+      showWords: state.showWords,
+      slow: state.slow,
+      heard: state.heard,
+    };
   },
   bubbleOf(name) {
     const npc = byName.get(name);

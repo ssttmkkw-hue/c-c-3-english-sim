@@ -18,6 +18,7 @@ const FROM_KEY = {
   '1': 'Digit1',
   '2': 'Digit2',
   '3': 'Digit3',
+  g: 'KeyG',
 };
 
 export function eventCode(event) {

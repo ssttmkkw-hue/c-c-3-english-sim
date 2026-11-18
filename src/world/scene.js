@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { ZONES, WORLD_LIMIT } from './zones.js';
+import { SKIT_SPOTS } from '../data/skits/index.js';
 import {
   makeBench, makeChair, makeClock, makeClothesRack, makeCoffeeMachine, makeCounter,
   makeCup, makeDesk, makeFloor, makeFlowerBed, makeFountain, makeLamp, makeMenuBoard,
-  makePlant, makePriceSign, makeShelf, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
+  makePlant, makePriceSign, makeShelf, makeSkitSpot, makeTable, makeTeacherDesk, makeTree, makeWhiteboard,
 } from './props.js';
 
 export function createScene() {
@@ -99,6 +100,8 @@ export function createScene() {
   makeClothesRack(props, 19.6, 9.2, 0.4, colliders);
   makePriceSign(props, 8.2, 17.2, 'Jacket', '$48', 0.4, colliders);
   makePriceSign(props, 15.2, 8.4, 'Hat', '$12', -0.6, colliders);
+
+  for (const spot of SKIT_SPOTS) makeSkitSpot(props, spot.x, spot.z);
 
   // Low walls at the world edge so the boundary reads clearly.
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.9 });

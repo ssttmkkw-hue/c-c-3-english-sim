@@ -10,6 +10,7 @@ export function createHUD() {
   const leaveEl = document.querySelector('#leave');
   const ttsEl = document.querySelector('#tts');
   const joinBtn = document.querySelector('#btn-join');
+  const skitBtn = document.querySelector('#btn-skit');
   const talkBtn = document.querySelector('#btn-talk');
   const micBtn = document.querySelector('#mic-btn');
   const transcriptEl = document.querySelector('#transcript');
@@ -229,14 +230,24 @@ export function createHUD() {
     closePractice();
     chooserNote.textContent = note || '';
     chooserList.innerHTML = '';
+    let lastSection = '';
     for (const item of items) {
+      if (item.section && item.section !== lastSection) {
+        lastSection = item.section;
+        const heading = document.createElement('p');
+        heading.className = 'chooser-section';
+        heading.textContent = item.section;
+        chooserList.appendChild(heading);
+      }
       const button = document.createElement('button');
       button.type = 'button';
       const title = document.createElement('span');
       title.textContent = item.title;
       const level = document.createElement('span');
-      level.className = `level ${item.level}`;
-      const label = item.level === 'intermediate' ? 'Intermediate' : 'Beginner';
+      level.className = `level ${item.level === 'intermediate' ? 'intermediate' : 'beginner'}`;
+      const label = item.kind === 'skit'
+        ? 'Skit'
+        : (item.level === 'intermediate' ? 'Intermediate' : 'Beginner');
       level.textContent = item.preferred ? `${label} · your level` : label;
       button.append(title, level);
       button.addEventListener('click', () => {
@@ -308,11 +319,13 @@ export function createHUD() {
     }
   }
 
-  function setActions({ join, talk }) {
+  function setActions({ join, talk, skit }) {
     joinBtn.classList.toggle('hidden', !join);
     talkBtn.classList.toggle('hidden', !talk);
+    skitBtn.classList.toggle('hidden', !skit);
     joinBtn.textContent = join || 'Join';
     talkBtn.textContent = talk || 'Talk';
+    skitBtn.textContent = skit || '🎭 Skit';
   }
 
   let micState = 'idle';
@@ -919,6 +932,154 @@ export function createHUD() {
     paintAmbient();
   });
 
+  const skitEl = document.querySelector('#skit');
+  const skitTitleEl = document.querySelector('#skit-title');
+  const skitPhaseEl = document.querySelector('#skit-phase');
+  const skitSpeakerEl = document.querySelector('#skit-speaker');
+  const skitLineEl = document.querySelector('#skit-line');
+  const skitZhEl = document.querySelector('#skit-zh');
+  const skitWordsEl = document.querySelector('#skit-words');
+  const skitFeedbackEl = document.querySelector('#skit-feedback');
+  const skitControls = document.querySelector('#skit-controls');
+  let onSkit = () => {};
+  let skitKey = '';
+  let skitMicBtn = null;
+
+  const PHASE_LABEL = {
+    watch: 'Watching',
+    roles: 'Choose a role',
+    rehearse: 'Rehearse',
+    perform: 'Your line',
+    curtain: 'Curtain call',
+  };
+
+  function skitButton(label, action, extra) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.dataset.skit = action;
+    if (extra) Object.assign(button.dataset, extra);
+    button.addEventListener('click', () => onSkit(action, extra || {}));
+    return button;
+  }
+
+  function paintSkitControls(model) {
+    skitControls.replaceChildren();
+    skitMicBtn = null;
+    if (model.phase === 'watch') {
+      skitControls.append(
+        skitButton('Replay', 'replay'),
+        skitButton(model.slow ? 'Slow 0.8×' : 'Slow 0.8×', 'slow'),
+        skitButton('Show words', 'words'),
+        skitButton('Skip to roles', 'skip'),
+        skitButton('Leave', 'leave'),
+      );
+    } else if (model.phase === 'roles') {
+      for (const role of model.roles || []) {
+        const row = document.createElement('div');
+        row.className = 'skit-role';
+        row.append(
+          skitButton(`${role.role} · ${role.lines} lines`, 'perform', { role: role.role }),
+          skitButton('Rehearse', 'rehearse', { role: role.role }),
+        );
+        skitControls.appendChild(row);
+      }
+      skitControls.append(skitButton('Watch again', 'replay'), skitButton('Leave', 'leave'));
+    } else if (model.phase === 'rehearse') {
+      skitControls.append(skitButton('Skip', 'skip-line'), skitButton('Leave', 'leave'));
+      appendSkitSay('Say it, or skip');
+    } else if (model.phase === 'perform') {
+      for (const level of model.ladder || []) {
+        const button = skitButton(level === 'first' ? 'First words' : level[0].toUpperCase() + level.slice(1), 'hint', { level });
+        button.dataset.hint = level;
+        skitControls.appendChild(button);
+      }
+      skitControls.append(skitButton('Tap to read', 'read'), skitButton('Leave', 'leave'));
+      appendSkitSay('Say it your way');
+    } else if (model.phase === 'curtain') {
+      skitControls.append(
+        skitButton('Replay', 'replay'),
+        skitButton('Try with fewer hints', 'fewer'),
+        skitButton('Leave', 'leave'),
+      );
+    }
+    paintSkitFlags(model);
+  }
+
+  function appendSkitSay(placeholder) {
+    const form = document.createElement('form');
+    form.id = 'skit-form';
+    const input = document.createElement('input');
+    input.id = 'skit-input';
+    input.type = 'text';
+    input.maxLength = 160;
+    input.autocomplete = 'off';
+    input.placeholder = placeholder;
+    const go = document.createElement('button');
+    go.type = 'submit';
+    go.textContent = 'Say';
+    form.append(input, go);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      onSkit('say', { text });
+    });
+    const mic = document.createElement('button');
+    mic.type = 'button';
+    mic.id = 'skit-mic';
+    mic.textContent = 'Hold to speak';
+    skitMicBtn = mic;
+    skitControls.append(form, mic);
+  }
+
+  function paintSkitFlags(model) {
+    const words = skitControls.querySelector('[data-skit="words"]');
+    if (words) words.classList.toggle('on', !!model.showWords);
+    const slow = skitControls.querySelector('[data-skit="slow"]');
+    if (slow) slow.classList.toggle('on', !!model.slow);
+    skitControls.querySelectorAll('[data-hint]').forEach((button) => {
+      button.classList.toggle('on', button.dataset.hint === model.hintLevel);
+    });
+  }
+
+  function renderSkit(model) {
+    if (!model || model.phase === 'idle') {
+      skitEl.classList.add('hidden');
+      document.body.classList.remove('skit-open');
+      skitKey = '';
+      skitMicBtn = null;
+      return;
+    }
+    skitEl.classList.remove('hidden');
+    document.body.classList.add('skit-open');
+    skitTitleEl.textContent = model.titleZh && model.zh ? `${model.title} · ${model.titleZh}` : (model.title || '');
+    skitPhaseEl.textContent = PHASE_LABEL[model.phase] || '';
+    const sub = model.subtitle;
+    skitSpeakerEl.textContent = sub && sub.speaker ? sub.speaker : '';
+    const showBlank = model.phase === 'perform' && model.hintLevel === 'blank' && model.waiting;
+    skitLineEl.textContent = showBlank ? 'Your line — say it your way.' : (sub && sub.text ? sub.text : '');
+    const zh = model.zh && sub && sub.zh ? sub.zh : '';
+    skitZhEl.textContent = zh;
+    skitWordsEl.replaceChildren();
+    if (model.showWords && sub && sub.text && !showBlank) {
+      for (const word of sub.text.split(/\s+/).filter(Boolean)) {
+        const chip = document.createElement('span');
+        chip.textContent = word;
+        skitWordsEl.appendChild(chip);
+      }
+    }
+    skitFeedbackEl.textContent = model.feedback || '';
+    const key = [model.phase, model.beat, model.role, model.rehearseIndex, model.waiting ? 1 : 0].join('|');
+    if (key !== skitKey) {
+      skitKey = key;
+      paintSkitControls(model);
+    } else {
+      paintSkitFlags(model);
+    }
+  }
+
   practicePlay.addEventListener('click', () => onPracticePlay());
   practiceClose.addEventListener('click', () => closePractice());
   practiceForm.addEventListener('submit', (event) => {
@@ -963,6 +1124,7 @@ export function createHUD() {
     sayEl,
     micBtn,
     joinBtn,
+    skitBtn,
     talkBtn,
     onChoice(fn) { onChoice = fn; },
     onSend(fn) { onSend = fn; },
@@ -998,5 +1160,8 @@ export function createHUD() {
     toast,
     celebrate,
     practiceMicBtn,
+    renderSkit,
+    onSkit(fn) { onSkit = fn; },
+    skitMicBtn() { return skitMicBtn; },
   };
 }

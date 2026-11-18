@@ -361,6 +361,36 @@ export function makePriceSign(group, x, z, title, price, rotY, colliders) {
   return g;
 }
 
+/** A small stage spot with a readable "Skit" sign. No collider, so you can stand on it. */
+export function makeSkitSpot(group, x, z) {
+  const g = new THREE.Group();
+  add(g, new THREE.CylinderGeometry(0.72, 0.82, 0.06, 18), mat(0x5c6bc0), 0, 0.04, 0);
+  add(g, new THREE.CylinderGeometry(0.28, 0.34, 0.1, 12), mat(0xffd54f), 0, 0.12, 0);
+  const tex = paintCanvas(256, 128, (ctx) => {
+    ctx.fillStyle = '#283593';
+    ctx.fillRect(0, 0, 256, 128);
+    ctx.fillStyle = '#fff8e1';
+    ctx.font = 'bold 54px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Skit', 128, 64);
+  });
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.72, 0.36),
+    new THREE.MeshBasicMaterial({ map: tex })
+  );
+  sign.position.set(0, 1.15, 0.02);
+  g.add(sign);
+  const back = sign.clone();
+  back.position.z = -0.02;
+  back.rotation.y = Math.PI;
+  g.add(back);
+  add(g, new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), mat(0x3949ab), 0, 0.55, 0);
+  g.position.set(x, 0, z);
+  group.add(g);
+  return g;
+}
+
 export function makeFloor(scene, x, z, w, d, color) {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
